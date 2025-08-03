@@ -10,8 +10,8 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({
     origin: [
         'http://localhost:3000',
-        'https://CenPenAdmin.github.io', // Replace with your GitHub Pages URL
-        /^https:\/\/.*\.ngrok\.io$/ // Allow any ngrok subdomain
+        'https://CenPenAdmin.github.io/PayMePi/', // Replace with your GitHub Pages URL
+        "https://297556bc9eea.ngrok-free.app" // Allow any ngrok subdomain
     ],
     credentials: true
 }));
