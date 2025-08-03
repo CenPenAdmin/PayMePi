@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi Payment Test</title>
+    <!-- Configuration -->
+    <script src="config.js"></script>
+    <!-- Pi SDK -->
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+</head>
+<body>
+    <h1>Pi Payment Test App</h1>
+    <p>Click the button below to send 1 Test Pi</p>
+    
+    <!-- Pi Authentication Button -->
+    <button id="signinButton" onclick="signIn()">Sign In with Pi</button>
+    
+    <!-- Payment Button (hidden until signed in) -->
+    <div id="paymentSection" style="display: none;">
+        <p>Welcome! You are now signed in.</p>
+        <button id="payButton" onclick="makePayment()">Pay 1 Test Pi</button>
+        <p id="paymentStatus"></p>
+    </div>
+
+    <script>
+        let piUser = null;
+        
+        // Initialize Pi SDK
+        Pi.init({
+            version: CONFIG.PI_SDK.version,
+            sandbox: CONFIG.PI_SDK.sandbox
+        });
+
+        // Sign in function
+        async function signIn() {
+            try {
+                // Authenticate user
+                const auth = await Pi.authenticate(['username', 'payments'], onIncompletePaymentFound);
+                piUser = auth.user;
+                
+                console.log('User authenticated:', piUser);
+                
+                // Hide sign in button and show payment section
+                document.getElementById('signinButton').style.display = 'none';
+                document.getElementById('paymentSection').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Authentication failed:', error);
+                alert('Sign in failed: ' + error.message);
+            }
+        }
+
+        // Payment function
+        async function makePayment() {
+            if (!piUser) {
+                alert('Please sign in first');
+                return;
+            }
+
+            try {
+                // Create payment
+                const payment = await Pi.createPayment({
+                    amount: CONFIG.PAYMENT.amount,
+                    memo: CONFIG.PAYMENT.memo,
+                    metadata: { 
+                        orderId: Date.now().toString(),
+                        itemName: CONFIG.PAYMENT.defaultMetadata.itemName
+                    }
+                }, {
+                    onReadyForServerApproval: function(paymentId) {
+                        console.log('Payment ready for approval:', paymentId);
+                        document.getElementById('paymentStatus').innerText = 'Payment initiated. Approving...';
+                        
+                        // Send to your server for approval
+                        approvePayment(paymentId);
+                    },
+                    onReadyForServerCompletion: function(paymentId, txId) {
+                        console.log('Payment ready for completion:', paymentId, txId);
+                        document.getElementById('paymentStatus').innerText = 'Payment processing...';
+                        
+                        // Send to your server for completion
+                        completePayment(paymentId, txId);
+                    },
+                    onCancel: function(paymentId) {
+                        console.log('Payment cancelled:', paymentId);
+                        document.getElementById('paymentStatus').innerText = 'Payment cancelled';
+                    },
+                    onError: function(error, payment) {
+                        console.error('Payment error:', error);
+                        document.getElementById('paymentStatus').innerText = 'Payment failed: ' + error.message;
+                    }
+                });
+
+                console.log('Payment created:', payment);
+                document.getElementById('paymentStatus').innerText = 'Payment initiated...';
+
+            } catch (error) {
+                console.error('Payment creation failed:', error);
+                document.getElementById('paymentStatus').innerText = 'Payment failed: ' + error.message;
+            }
+        }
+
+        // Handle incomplete payments (required callback)
+        function onIncompletePaymentFound(payment) {
+            console.log('Incomplete payment found:', payment);
+            // Handle incomplete payment if needed
+        }
+
+        // Approve payment on server
+        async function approvePayment(paymentId) {
+            try {
+                const response = await fetch(`${CONFIG.BACKEND_URL}/approve-payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ paymentId })
+                });
+
+                const result = await response.json();
+                console.log('Payment approval result:', result);
+                
+            } catch (error) {
+                console.error('Payment approval failed:', error);
+                document.getElementById('paymentStatus').innerText = 'Payment approval failed';
+            }
+        }
+
+        // Complete payment on server
+        async function completePayment(paymentId, txId) {
+            try {
+                const response = await fetch(`${CONFIG.BACKEND_URL}/complete-payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ paymentId, txId })
+                });
+
+                const result = await response.json();
+                console.log('Payment completion result:', result);
+                
+                if (result.success) {
+                    document.getElementById('paymentStatus').innerText = 'Payment completed successfully!';
+                } else {
+                    document.getElementById('paymentStatus').innerText = 'Payment completion failed';
+                }
+                
+            } catch (error) {
+                console.error('Payment completion failed:', error);
+                document.getElementById('paymentStatus').innerText = 'Payment completion failed';
+            }
+        }
+    </script>
+</body>
+</html>
