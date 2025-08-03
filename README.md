@@ -4,7 +4,7 @@ A minimal Pi Network payment application for learning how to integrate Pi coin p
 
 ## Live Demo
 
-**Frontend**: [https://CenPenAdmin.github.io/pi-payment-app/](https://CenPenAdmin.github.io/pi-payment-app/)
+**Frontend**: [https://CenPenAdmin.github.io/PayMePi/](https://CenPenAdmin.github.io/PayMePi/)
 
 ## What This App Does
 
