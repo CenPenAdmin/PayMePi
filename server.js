@@ -21,8 +21,8 @@ app.use(bodyParser.json());
 app.use(express.static('.')); // Serve static files from current directory
 
 // Your Pi API Key (you'll need to get this from Pi Developer Portal)
-const PI_API_KEY = process.env.PI_API_KEY || 'your-pi-api-key-here';
-const PI_API_URL = 'https://api.minepi.com'; // Use testnet URL for testing
+const PI_API_KEY = process.env.PI_API_KEY || 'sogxnhwllqqlotxsjronw2vcy9njrg4jnbn4szsjke4fblvmkpalirsaovobghcp';
+const PI_API_URL = 'https://api.minepi.com'; // Use testnet URL: https://api.minepi.com
 
 // Serve the HTML page
 app.get('/', (req, res) => {
@@ -33,9 +33,31 @@ app.get('/', (req, res) => {
 app.post('/approve-payment', async (req, res) => {
     const { paymentId } = req.body;
     
-    console.log('Approving payment:', paymentId);
+    console.log('=== PAYMENT APPROVAL REQUEST ===');
+    console.log('Payment ID:', paymentId);
+    console.log('PI_API_KEY set:', PI_API_KEY !== 'your-pi-api-key-here');
+    console.log('Request origin:', req.get('origin'));
+    
+    // Add CORS headers explicitly
+    res.header('Access-Control-Allow-Origin', req.get('origin'));
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    if (!paymentId) {
+        console.error('No payment ID provided');
+        return res.status(400).json({ success: false, error: 'Payment ID required' });
+    }
+    
+    if (PI_API_KEY === 'your-pi-api-key-here') {
+        console.error('Pi API key not set!');
+        return res.status(500).json({ 
+            success: false, 
+            error: 'Pi API key not configured. Set PI_API_KEY environment variable.' 
+        });
+    }
     
     try {
+        console.log('Calling Pi API to approve payment...');
+        
         // Call Pi API to approve the payment
         const response = await fetch(`${PI_API_URL}/v2/payments/${paymentId}/approve`, {
             method: 'POST',
@@ -45,17 +67,21 @@ app.post('/approve-payment', async (req, res) => {
             }
         });
 
+        const responseText = await response.text();
+        console.log('Pi API response status:', response.status);
+        console.log('Pi API response:', responseText);
+
         if (response.ok) {
-            console.log('Payment approved successfully');
+            console.log('✅ Payment approved successfully');
             res.json({ success: true, message: 'Payment approved' });
         } else {
-            console.error('Payment approval failed:', response.statusText);
-            res.status(400).json({ success: false, error: 'Payment approval failed' });
+            console.error('❌ Payment approval failed:', response.status, responseText);
+            res.status(400).json({ success: false, error: `Payment approval failed: ${responseText}` });
         }
         
     } catch (error) {
-        console.error('Error approving payment:', error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
+        console.error('❌ Error approving payment:', error.message);
+        res.status(500).json({ success: false, error: `Internal server error: ${error.message}` });
     }
 });
 
@@ -63,9 +89,22 @@ app.post('/approve-payment', async (req, res) => {
 app.post('/complete-payment', async (req, res) => {
     const { paymentId, txId } = req.body;
     
-    console.log('Completing payment:', paymentId, 'Transaction ID:', txId);
+    console.log('=== PAYMENT COMPLETION REQUEST ===');
+    console.log('Payment ID:', paymentId);
+    console.log('Transaction ID:', txId);
+    
+    // Add CORS headers explicitly
+    res.header('Access-Control-Allow-Origin', req.get('origin'));
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    if (!paymentId || !txId) {
+        console.error('Missing payment ID or transaction ID');
+        return res.status(400).json({ success: false, error: 'Payment ID and Transaction ID required' });
+    }
     
     try {
+        console.log('Calling Pi API to complete payment...');
+        
         // Call Pi API to complete the payment
         const response = await fetch(`${PI_API_URL}/v2/payments/${paymentId}/complete`, {
             method: 'POST',
@@ -76,24 +115,53 @@ app.post('/complete-payment', async (req, res) => {
             body: JSON.stringify({ txid: txId })
         });
 
+        const responseText = await response.text();
+        console.log('Pi API completion response status:', response.status);
+        console.log('Pi API completion response:', responseText);
+
         if (response.ok) {
-            const data = await response.json();
-            console.log('Payment completed successfully:', data);
+            const data = JSON.parse(responseText);
+            console.log('✅ Payment completed successfully:', data);
             res.json({ success: true, message: 'Payment completed', data });
         } else {
-            console.error('Payment completion failed:', response.statusText);
-            res.status(400).json({ success: false, error: 'Payment completion failed' });
+            console.error('❌ Payment completion failed:', response.status, responseText);
+            res.status(400).json({ success: false, error: `Payment completion failed: ${responseText}` });
         }
         
     } catch (error) {
-        console.error('Error completing payment:', error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
+        console.error('❌ Error completing payment:', error.message);
+        res.status(500).json({ success: false, error: `Internal server error: ${error.message}` });
     }
 });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ status: 'Server is running', timestamp: new Date().toISOString() });
+    res.json({ 
+        status: 'Server is running', 
+        timestamp: new Date().toISOString(),
+        piApiKeySet: PI_API_KEY !== 'your-pi-api-key-here',
+        cors: {
+            origin: req.get('origin'),
+            allowedOrigins: [
+                'http://localhost:3000',
+                'https://CenPenAdmin.github.io',
+                'https://297556bc9eea.ngrok-free.app'
+            ]
+        }
+    });
+});
+
+// Test CORS endpoint
+app.options('*', cors()); // Enable preflight for all routes
+
+app.get('/test-cors', (req, res) => {
+    res.header('Access-Control-Allow-Origin', req.get('origin'));
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.json({ 
+        message: 'CORS test successful',
+        origin: req.get('origin'),
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Start server
