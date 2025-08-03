@@ -15,9 +15,27 @@ app.use(cors({
         /^https:\/\/.*\.ngrok\.io$/, // Allow any ngrok.io subdomain
         /^https:\/\/.*\.ngrok-free\.app$/ // Allow any ngrok-free.app subdomain
     ],
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
+// Handle preflight requests for all routes
+app.options('*', cors());
+
 app.use(bodyParser.json());
+
+// Add request logging middleware
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    console.log('Origin:', req.get('origin'));
+    console.log('User-Agent:', req.get('user-agent'));
+    if (req.body && Object.keys(req.body).length > 0) {
+        console.log('Body:', JSON.stringify(req.body, null, 2));
+    }
+    console.log('---');
+    next();
+});
 app.use(express.static('.')); // Serve static files from current directory
 
 // Your Pi API Key (you'll need to get this from Pi Developer Portal)
@@ -152,8 +170,6 @@ app.get('/health', (req, res) => {
 });
 
 // Test CORS endpoint
-app.options('*', cors()); // Enable preflight for all routes
-
 app.get('/test-cors', (req, res) => {
     res.header('Access-Control-Allow-Origin', req.get('origin'));
     res.header('Access-Control-Allow-Credentials', 'true');
