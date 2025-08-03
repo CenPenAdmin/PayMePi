@@ -18,34 +18,66 @@
     
     <!-- Payment Button (hidden until signed in) -->
     <div id="paymentSection" style="display: none;">
-        <p>Welcome! You are now signed in.</p>
+        <h2>Welcome!</h2>
+        <p id="userInfo">You are now signed in.</p>
         <button id="payButton" onclick="makePayment()">Pay 1 Test Pi</button>
         <p id="paymentStatus"></p>
+        <div id="debugInfo" style="margin-top: 20px; padding: 10px; background: #f0f0f0; font-family: monospace; font-size: 12px;">
+            <strong>Debug Information:</strong><br>
+            <div id="debugContent"></div>
+        </div>
     </div>
 
     <script>
         let piUser = null;
         
+        // Debug function
+        function addDebugInfo(message) {
+            const debugContent = document.getElementById('debugContent');
+            const timestamp = new Date().toLocaleTimeString();
+            debugContent.innerHTML += `[${timestamp}] ${message}<br>`;
+            console.log(`[DEBUG] ${message}`);
+        }
+        
         // Initialize Pi SDK
+        addDebugInfo('Initializing Pi SDK...');
         Pi.init({
             version: CONFIG.PI_SDK.version,
             sandbox: CONFIG.PI_SDK.sandbox
         });
+        addDebugInfo(`Pi SDK initialized - Version: ${CONFIG.PI_SDK.version}, Sandbox: ${CONFIG.PI_SDK.sandbox}`);
+        addDebugInfo(`Backend URL: ${CONFIG.BACKEND_URL}`);
 
         // Sign in function
         async function signIn() {
             try {
-                // Authenticate user
-                const auth = await Pi.authenticate(['username', 'payments'], onIncompletePaymentFound);
-                piUser = auth.user;
+                addDebugInfo('Starting Pi authentication...');
                 
-                console.log('User authenticated:', piUser);
+                // Authenticate user with required scopes
+                const auth = await Pi.authenticate([
+                    'username', 
+                    'payments'
+                ], onIncompletePaymentFound);
+                
+                piUser = auth.user;
+                addDebugInfo(`Authentication successful! User: ${piUser.username}`);
+                console.log('Full auth object:', auth);
+                console.log('User object:', piUser);
+                
+                // Update UI with user information
+                document.getElementById('userInfo').innerHTML = `
+                    <strong>Welcome, ${piUser.username}!</strong><br>
+                    <small>UID: ${piUser.uid}</small>
+                `;
                 
                 // Hide sign in button and show payment section
                 document.getElementById('signinButton').style.display = 'none';
                 document.getElementById('paymentSection').style.display = 'block';
                 
+                addDebugInfo('UI updated - ready for payments');
+                
             } catch (error) {
+                addDebugInfo(`Authentication failed: ${error.message}`);
                 console.error('Authentication failed:', error);
                 alert('Sign in failed: ' + error.message);
             }
@@ -58,6 +90,9 @@
                 return;
             }
 
+            addDebugInfo(`Creating payment for user: ${piUser.username}`);
+            document.getElementById('paymentStatus').innerText = 'Creating payment...';
+
             try {
                 // Create payment
                 const payment = await Pi.createPayment({
@@ -65,10 +100,13 @@
                     memo: CONFIG.PAYMENT.memo,
                     metadata: { 
                         orderId: Date.now().toString(),
-                        itemName: CONFIG.PAYMENT.defaultMetadata.itemName
+                        itemName: CONFIG.PAYMENT.defaultMetadata.itemName,
+                        username: piUser.username,
+                        uid: piUser.uid
                     }
                 }, {
                     onReadyForServerApproval: function(paymentId) {
+                        addDebugInfo(`Payment ready for server approval: ${paymentId}`);
                         console.log('Payment ready for approval:', paymentId);
                         document.getElementById('paymentStatus').innerText = 'Payment initiated. Approving...';
                         
@@ -76,6 +114,7 @@
                         approvePayment(paymentId);
                     },
                     onReadyForServerCompletion: function(paymentId, txId) {
+                        addDebugInfo(`Payment ready for completion: ${paymentId}, TX: ${txId}`);
                         console.log('Payment ready for completion:', paymentId, txId);
                         document.getElementById('paymentStatus').innerText = 'Payment processing...';
                         
@@ -83,19 +122,23 @@
                         completePayment(paymentId, txId);
                     },
                     onCancel: function(paymentId) {
+                        addDebugInfo(`Payment cancelled: ${paymentId}`);
                         console.log('Payment cancelled:', paymentId);
                         document.getElementById('paymentStatus').innerText = 'Payment cancelled';
                     },
                     onError: function(error, payment) {
+                        addDebugInfo(`Payment error: ${error.message}`);
                         console.error('Payment error:', error);
                         document.getElementById('paymentStatus').innerText = 'Payment failed: ' + error.message;
                     }
                 });
 
+                addDebugInfo(`Payment created successfully: ${payment.identifier}`);
                 console.log('Payment created:', payment);
                 document.getElementById('paymentStatus').innerText = 'Payment initiated...';
 
             } catch (error) {
+                addDebugInfo(`Payment creation failed: ${error.message}`);
                 console.error('Payment creation failed:', error);
                 document.getElementById('paymentStatus').innerText = 'Payment failed: ' + error.message;
             }
@@ -110,6 +153,8 @@
         // Approve payment on server
         async function approvePayment(paymentId) {
             try {
+                addDebugInfo(`Sending approval request to backend: ${paymentId}`);
+                
                 const response = await fetch(`${CONFIG.BACKEND_URL}/approve-payment`, {
                     method: 'POST',
                     headers: {
@@ -118,18 +163,28 @@
                     body: JSON.stringify({ paymentId })
                 });
 
+                addDebugInfo(`Backend approval response: ${response.status} ${response.statusText}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
                 const result = await response.json();
+                addDebugInfo(`Payment approval result: ${JSON.stringify(result)}`);
                 console.log('Payment approval result:', result);
                 
             } catch (error) {
+                addDebugInfo(`Payment approval failed: ${error.message}`);
                 console.error('Payment approval failed:', error);
-                document.getElementById('paymentStatus').innerText = 'Payment approval failed';
+                document.getElementById('paymentStatus').innerText = 'Payment approval failed: ' + error.message;
             }
         }
 
         // Complete payment on server
         async function completePayment(paymentId, txId) {
             try {
+                addDebugInfo(`Sending completion request to backend: ${paymentId}, TX: ${txId}`);
+                
                 const response = await fetch(`${CONFIG.BACKEND_URL}/complete-payment`, {
                     method: 'POST',
                     headers: {
@@ -138,18 +193,28 @@
                     body: JSON.stringify({ paymentId, txId })
                 });
 
+                addDebugInfo(`Backend completion response: ${response.status} ${response.statusText}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
                 const result = await response.json();
+                addDebugInfo(`Payment completion result: ${JSON.stringify(result)}`);
                 console.log('Payment completion result:', result);
                 
                 if (result.success) {
                     document.getElementById('paymentStatus').innerText = 'Payment completed successfully!';
+                    addDebugInfo('🎉 PAYMENT SUCCESSFUL!');
                 } else {
                     document.getElementById('paymentStatus').innerText = 'Payment completion failed';
+                    addDebugInfo('❌ Payment completion failed');
                 }
                 
             } catch (error) {
+                addDebugInfo(`Payment completion failed: ${error.message}`);
                 console.error('Payment completion failed:', error);
-                document.getElementById('paymentStatus').innerText = 'Payment completion failed';
+                document.getElementById('paymentStatus').innerText = 'Payment completion failed: ' + error.message;
             }
         }
     </script>
