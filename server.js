@@ -163,7 +163,7 @@ app.get('/health', (req, res) => {
             allowedOrigins: [
                 'http://localhost:3000',
                 'https://CenPenAdmin.github.io',
-                'https://297556bc9eea.ngrok-free.app'
+                'https://449906c2edda.ngrok-free.app'
             ]
         }
     });
