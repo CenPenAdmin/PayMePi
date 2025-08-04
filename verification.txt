@@ -1,0 +1,6 @@
+PayMePi - Pi Network Testnet App
+Developer: CenPenAdmin
+App URL: https://CenPenAdmin.github.io/PayMePi
+Backend: https://99f8edb5e2de.ngrok-free.app
+Status: Active
+Verification: This domain is owned by the PayMePi app developer.
