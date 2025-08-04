@@ -11,7 +11,7 @@ app.use(cors({
     origin: [
         'http://localhost:3000',
         'https://CenPenAdmin.github.io', // GitHub Pages (without trailing slash)
-        'https://297556bc9eea.ngrok-free.app', // Your current ngrok URL
+        'https://449906c2edda.ngrok-free.app', // Your current ngrok URL
         /^https:\/\/.*\.ngrok\.io$/, // Allow any ngrok.io subdomain
         /^https:\/\/.*\.ngrok-free\.app$/ // Allow any ngrok-free.app subdomain
     ],
