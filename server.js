@@ -8,16 +8,40 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-    origin: [
-        'http://localhost:3000',
-        'https://CenPenAdmin.github.io', // GitHub Pages (without trailing slash)
-        'https://449906c2edda.ngrok-free.app', // Your current ngrok URL
-        /^https:\/\/.*\.ngrok\.io$/, // Allow any ngrok.io subdomain
-        /^https:\/\/.*\.ngrok-free\.app$/ // Allow any ngrok-free.app subdomain
-    ],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'https://CenPenAdmin.github.io',
+            'https://449906c2edda.ngrok-free.app'
+        ];
+        
+        const allowedPatterns = [
+            /^https:\/\/.*\.ngrok\.io$/,
+            /^https:\/\/.*\.ngrok-free\.app$/,
+            /^https:\/\/.*\.github\.io$/
+        ];
+        
+        // Check exact matches
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        
+        // Check pattern matches
+        if (allowedPatterns.some(pattern => pattern.test(origin))) {
+            return callback(null, true);
+        }
+        
+        console.log('CORS blocked origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'ngrok-skip-browser-warning']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'ngrok-skip-browser-warning'],
+    exposedHeaders: ['*'],
+    maxAge: 86400
 }));
 
 // Handle preflight requests for all routes
@@ -171,11 +195,24 @@ app.get('/health', (req, res) => {
 
 // Test CORS endpoint
 app.get('/test-cors', (req, res) => {
-    res.header('Access-Control-Allow-Origin', req.get('origin'));
+    console.log('CORS test request from origin:', req.get('origin'));
+    res.header('Access-Control-Allow-Origin', req.get('origin') || '*');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.json({ 
         message: 'CORS test successful',
         origin: req.get('origin'),
+        timestamp: new Date().toISOString(),
+        headers: req.headers
+    });
+});
+
+// Simple test endpoint without CORS
+app.get('/simple-test', (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', '*');
+    res.header('Access-Control-Allow-Headers', '*');
+    res.json({ 
+        message: 'Simple test successful - no CORS restrictions',
         timestamp: new Date().toISOString()
     });
 });

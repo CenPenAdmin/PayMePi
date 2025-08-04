@@ -55,28 +55,75 @@
 
         // Test backend connection
         async function testBackend() {
+            addDebugInfo('=== BACKEND CONNECTION TEST ===');
+            
+            // Test 1: Simple test endpoint (no CORS restrictions)
             try {
-                addDebugInfo('Testing backend connection...');
+                addDebugInfo('Test 1: Simple endpoint (no CORS)...');
                 
-                const response = await fetch(`${CONFIG.BACKEND_URL}/health`, {
+                const response1 = await fetch(`${CONFIG.BACKEND_URL}/simple-test`, {
                     method: 'GET',
                     headers: {
                         'ngrok-skip-browser-warning': 'true'
                     }
                 });
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                if (response1.ok) {
+                    const result1 = await response1.json();
+                    addDebugInfo(`✅ Simple test successful: ${result1.message}`);
+                } else {
+                    addDebugInfo(`❌ Simple test failed: ${response1.status} ${response1.statusText}`);
                 }
                 
-                const result = await response.json();
-                addDebugInfo(`✅ Backend connection successful: ${JSON.stringify(result)}`);
-                alert('Backend connection successful! Check debug panel for details.');
+            } catch (error) {
+                addDebugInfo(`❌ Simple test error: ${error.message}`);
+            }
+            
+            // Test 2: Health endpoint with CORS
+            try {
+                addDebugInfo('Test 2: Health endpoint (with CORS)...');
+                
+                const response2 = await fetch(`${CONFIG.BACKEND_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (response2.ok) {
+                    const result2 = await response2.json();
+                    addDebugInfo(`✅ Health test successful: ${result2.status}`);
+                } else {
+                    addDebugInfo(`❌ Health test failed: ${response2.status} ${response2.statusText}`);
+                }
                 
             } catch (error) {
-                addDebugInfo(`❌ Backend connection failed: ${error.message}`);
-                alert(`Backend connection failed: ${error.message}`);
+                addDebugInfo(`❌ Health test error: ${error.message}`);
             }
+            
+            // Test 3: CORS test endpoint
+            try {
+                addDebugInfo('Test 3: CORS test endpoint...');
+                
+                const response3 = await fetch(`${CONFIG.BACKEND_URL}/test-cors`, {
+                    method: 'GET',
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (response3.ok) {
+                    const result3 = await response3.json();
+                    addDebugInfo(`✅ CORS test successful: ${result3.message}`);
+                } else {
+                    addDebugInfo(`❌ CORS test failed: ${response3.status} ${response3.statusText}`);
+                }
+                
+            } catch (error) {
+                addDebugInfo(`❌ CORS test error: ${error.message}`);
+            }
+            
+            addDebugInfo('=== TEST COMPLETE - Check results above ===');
         }
 
         // Sign in function
