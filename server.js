@@ -1,3 +1,6 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -62,9 +65,17 @@ app.use((req, res, next) => {
 });
 app.use(express.static('.')); // Serve static files from current directory
 
-// Your Pi API Key (you'll need to get this from Pi Developer Portal)
-const PI_API_KEY = process.env.PI_API_KEY || 'sogxnhwllqqlotxsjronw2vcy9njrg4jnbn4szsjke4fblvmkpalirsaovobghcp';
+// Your Pi API Key - MUST be set as environment variable for security
+const PI_API_KEY = process.env.PI_API_KEY;
 const PI_API_URL = 'https://api.minepi.com'; // Use testnet URL: https://api.minepi.com
+
+// Security check - ensure API key is provided via environment variable
+if (!PI_API_KEY) {
+    console.error('❌ CRITICAL: PI_API_KEY environment variable not set!');
+    console.error('For security, the Pi API key must be provided as an environment variable.');
+    console.error('Set it by running: $env:PI_API_KEY="your-api-key-here"');
+    process.exit(1);
+}
 
 // Serve the HTML page
 app.get('/', (req, res) => {
@@ -77,7 +88,7 @@ app.post('/approve-payment', async (req, res) => {
     
     console.log('=== PAYMENT APPROVAL REQUEST ===');
     console.log('Payment ID:', paymentId);
-    console.log('PI_API_KEY set:', PI_API_KEY !== 'your-pi-api-key-here');
+    console.log('PI_API_KEY set:', !!PI_API_KEY);
     console.log('Request origin:', req.get('origin'));
     
     // Add CORS headers explicitly
@@ -87,14 +98,6 @@ app.post('/approve-payment', async (req, res) => {
     if (!paymentId) {
         console.error('No payment ID provided');
         return res.status(400).json({ success: false, error: 'Payment ID required' });
-    }
-    
-    if (PI_API_KEY === 'your-pi-api-key-here') {
-        console.error('Pi API key not set!');
-        return res.status(500).json({ 
-            success: false, 
-            error: 'Pi API key not configured. Set PI_API_KEY environment variable.' 
-        });
     }
     
     try {
@@ -181,7 +184,7 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: 'Server is running', 
         timestamp: new Date().toISOString(),
-        piApiKeySet: PI_API_KEY !== 'your-pi-api-key-here',
+        piApiKeySet: !!PI_API_KEY,
         cors: {
             origin: req.get('origin'),
             allowedOrigins: [
