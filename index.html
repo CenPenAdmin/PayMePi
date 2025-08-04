@@ -13,6 +13,11 @@
     <h1>Pi Payment Test App</h1>
     <p>Click the button below to send 1 Test Pi</p>
     
+    <!-- Test Backend Connection -->
+    <button onclick="testBackend()" style="background: #007bff; color: white; padding: 10px; margin: 10px;">
+        Test Backend Connection
+    </button>
+    
     <!-- Pi Authentication Button -->
     <button id="signinButton" onclick="signIn()">Sign In with Pi</button>
     
@@ -47,6 +52,32 @@
         });
         addDebugInfo(`Pi SDK initialized - Version: ${CONFIG.PI_SDK.version}, Sandbox: ${CONFIG.PI_SDK.sandbox}`);
         addDebugInfo(`Backend URL: ${CONFIG.BACKEND_URL}`);
+
+        // Test backend connection
+        async function testBackend() {
+            try {
+                addDebugInfo('Testing backend connection...');
+                
+                const response = await fetch(`${CONFIG.BACKEND_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                addDebugInfo(`✅ Backend connection successful: ${JSON.stringify(result)}`);
+                alert('Backend connection successful! Check debug panel for details.');
+                
+            } catch (error) {
+                addDebugInfo(`❌ Backend connection failed: ${error.message}`);
+                alert(`Backend connection failed: ${error.message}`);
+            }
+        }
 
         // Sign in function
         async function signIn() {
