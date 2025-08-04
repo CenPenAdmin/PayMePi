@@ -15,7 +15,7 @@ app.use(cors({
         const allowedOrigins = [
             'http://localhost:3000',
             'https://CenPenAdmin.github.io',
-            'https://99f8edb5e2de.ngrok-free.app'
+            'https://20857d3d376c.ngrok-free.app'
         ];
         
         const allowedPatterns = [
@@ -187,7 +187,7 @@ app.get('/health', (req, res) => {
             allowedOrigins: [
                 'http://localhost:3000',
                 'https://CenPenAdmin.github.io',
-                'https://99f8edb5e2de.ngrok-free.app'
+                'https://20857d3d376c.ngrok-free.app'
             ]
         }
     });
