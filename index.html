@@ -159,6 +159,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true' // Skip ngrok browser warning
                     },
                     body: JSON.stringify({ paymentId })
                 });
@@ -166,7 +167,8 @@
                 addDebugInfo(`Backend approval response: ${response.status} ${response.statusText}`);
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
 
                 const result = await response.json();
@@ -189,6 +191,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true' // Skip ngrok browser warning
                     },
                     body: JSON.stringify({ paymentId, txId })
                 });
@@ -196,7 +199,8 @@
                 addDebugInfo(`Backend completion response: ${response.status} ${response.statusText}`);
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
 
                 const result = await response.json();
