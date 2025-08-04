@@ -2,9 +2,27 @@
 
 A minimal Pi Network payment application for learning how to integrate Pi coin payments.
 
-## Live Demo
+## 🚀 Live Demo
 
 **Frontend**: [https://CenPenAdmin.github.io/PayMePi/](https://CenPenAdmin.github.io/PayMePi/)
+**Easy Access Page**: [https://CenPenAdmin.github.io/PayMePi/easy-access.html](https://CenPenAdmin.github.io/PayMePi/easy-access.html)
+
+## 📱 Share with Friends
+
+### Quick Access Options:
+
+1. **Direct URL**: `https://cenpenadmin.github.io/PayMePi/`
+2. **QR Code**: Visit the app and click "Show QR Code" button
+3. **Easy Access Page**: Share `https://cenpenadmin.github.io/PayMePi/easy-access.html`
+
+### For Friends to Test:
+
+1. **Open Pi Browser** (not regular Chrome/Safari)
+2. **Enable Developer Mode** in Pi Browser settings
+3. **Visit the URL** above or scan QR code
+4. **Sign in** with Pi account and test payments!
+
+**Note**: Pi Network doesn't have a public app store for testnet apps. Apps are accessed via direct URLs.
 
 ## What This App Does
 
@@ -12,6 +30,8 @@ A minimal Pi Network payment application for learning how to integrate Pi coin p
 - Allows users to sign in with their Pi account
 - Processes a 1 Pi payment on the Pi testnet
 - Demonstrates the complete Pi payment flow
+- Includes sharing features (URL copy, QR code generation)
+- Built-in debugging and connection testing
 
 ## Architecture
 
