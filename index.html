@@ -46,12 +46,32 @@
         
         // Initialize Pi SDK
         addDebugInfo('Initializing Pi SDK...');
-        Pi.init({
-            version: CONFIG.PI_SDK.version,
-            sandbox: CONFIG.PI_SDK.sandbox
-        });
-        addDebugInfo(`Pi SDK initialized - Version: ${CONFIG.PI_SDK.version}, Sandbox: ${CONFIG.PI_SDK.sandbox}`);
+        
+        // Check if Pi SDK loaded properly
+        if (typeof Pi === 'undefined') {
+            addDebugInfo('❌ Pi SDK not loaded! Make sure you are using Pi Browser.');
+            alert('Error: Pi SDK not detected. Please open this app in Pi Browser.');
+        } else {
+            addDebugInfo('✅ Pi SDK loaded successfully');
+            
+            Pi.init({
+                version: CONFIG.PI_SDK.version,
+                sandbox: CONFIG.PI_SDK.sandbox
+            });
+            addDebugInfo(`Pi SDK initialized - Version: ${CONFIG.PI_SDK.version}, Sandbox: ${CONFIG.PI_SDK.sandbox}`);
+        }
+        
         addDebugInfo(`Backend URL: ${CONFIG.BACKEND_URL}`);
+        
+        // Check browser environment
+        const userAgent = navigator.userAgent;
+        addDebugInfo(`Browser: ${userAgent}`);
+        
+        if (userAgent.includes('Pi Browser') || userAgent.includes('iPhone')) {
+            addDebugInfo('✅ Pi Browser detected');
+        } else {
+            addDebugInfo('⚠️ Not Pi Browser - authentication may not work');
+        }
 
         // Test backend connection
         async function testBackend() {
@@ -130,6 +150,24 @@
         async function signIn() {
             try {
                 addDebugInfo('Starting Pi authentication...');
+                addDebugInfo('Checking Pi SDK availability...');
+                
+                // Check if Pi SDK is available
+                if (typeof Pi === 'undefined') {
+                    throw new Error('Pi SDK not loaded. Make sure you are using Pi Browser.');
+                }
+                
+                addDebugInfo('Pi SDK detected. Checking Pi Browser environment...');
+                
+                // Check if we're in Pi Browser
+                const userAgent = navigator.userAgent;
+                addDebugInfo(`User Agent: ${userAgent}`);
+                
+                if (!userAgent.includes('Pi Browser') && !userAgent.includes('iPhone')) {
+                    addDebugInfo('⚠️ Warning: Not detected as Pi Browser. This may cause issues.');
+                }
+                
+                addDebugInfo('Attempting Pi.authenticate...');
                 
                 // Authenticate user with required scopes
                 const auth = await Pi.authenticate([
@@ -139,6 +177,7 @@
                 
                 piUser = auth.user;
                 addDebugInfo(`Authentication successful! User: ${piUser.username}`);
+                addDebugInfo(`User UID: ${piUser.uid}`);
                 console.log('Full auth object:', auth);
                 console.log('User object:', piUser);
                 
@@ -157,7 +196,17 @@
             } catch (error) {
                 addDebugInfo(`Authentication failed: ${error.message}`);
                 console.error('Authentication failed:', error);
-                alert('Sign in failed: ' + error.message);
+                
+                // More specific error handling
+                if (error.message.includes('Pi SDK not loaded')) {
+                    alert('Error: This app must be opened in Pi Browser. Please copy the URL and open it in Pi Browser app.');
+                } else if (error.message.includes('User denied')) {
+                    alert('Pi authentication was denied. Please try again and allow access.');
+                } else if (error.message.includes('Not available')) {
+                    alert('Pi authentication not available. Make sure you are signed into Pi Browser and have developer mode enabled.');
+                } else {
+                    alert('Sign in failed: ' + error.message + '\n\nTips:\n1. Make sure you are using Pi Browser\n2. Enable Developer/Sandbox mode\n3. Clear Pi Browser cache and try again');
+                }
             }
         }
 
