@@ -5,6 +5,12 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const { MongoClient } = require('mongodb');
+
+// MongoDB configuration
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
+const DATABASE_NAME = 'pay_me_pi';
+let db;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -77,6 +83,23 @@ if (!PI_API_KEY) {
     process.exit(1);
 }
 
+// Connect to MongoDB
+async function connectToMongoDB() {
+    try {
+        const client = new MongoClient(MONGO_URI);
+        await client.connect();
+        db = client.db(DATABASE_NAME);
+        console.log('✅ Connected to MongoDB at', MONGO_URI);
+        console.log('📊 Database:', DATABASE_NAME);
+    } catch (error) {
+        console.error('❌ MongoDB connection failed:', error.message);
+        console.log('⚠️  App will continue without database logging');
+    }
+}
+
+// Initialize MongoDB connection
+connectToMongoDB();
+
 // Serve the HTML page
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -118,6 +141,22 @@ app.post('/approve-payment', async (req, res) => {
 
         if (response.ok) {
             console.log('✅ Payment approved successfully');
+            
+            // Save payment approval to MongoDB
+            if (db) {
+                try {
+                    await db.collection('payments').insertOne({
+                        paymentId,
+                        status: 'approved',
+                        timestamp: new Date(),
+                        apiResponse: responseText
+                    });
+                    console.log('💾 Payment approval saved to database');
+                } catch (dbError) {
+                    console.error('⚠️  Database save failed:', dbError.message);
+                }
+            }
+            
             res.json({ success: true, message: 'Payment approved' });
         } else {
             console.error('❌ Payment approval failed:', response.status, responseText);
@@ -167,6 +206,27 @@ app.post('/complete-payment', async (req, res) => {
         if (response.ok) {
             const data = JSON.parse(responseText);
             console.log('✅ Payment completed successfully:', data);
+            
+            // Update payment completion in MongoDB
+            if (db) {
+                try {
+                    await db.collection('payments').updateOne(
+                        { paymentId },
+                        { 
+                            $set: { 
+                                status: 'completed', 
+                                txId, 
+                                completedAt: new Date(),
+                                completionData: data
+                            } 
+                        }
+                    );
+                    console.log('💾 Payment completion saved to database');
+                } catch (dbError) {
+                    console.error('⚠️  Database update failed:', dbError.message);
+                }
+            }
+            
             res.json({ success: true, message: 'Payment completed', data });
         } else {
             console.error('❌ Payment completion failed:', response.status, responseText);
@@ -179,12 +239,38 @@ app.post('/complete-payment', async (req, res) => {
     }
 });
 
+// Get payment history from database
+app.get('/payments', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const payments = await db.collection('payments').find().sort({ timestamp: -1 }).toArray();
+        res.json({ 
+            success: true, 
+            count: payments.length,
+            payments 
+        });
+    } catch (error) {
+        console.error('❌ Failed to fetch payments:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch payments' 
+        });
+    }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'Server is running', 
         timestamp: new Date().toISOString(),
         piApiKeySet: !!PI_API_KEY,
+        mongoDbConnected: !!db,
         cors: {
             origin: req.get('origin'),
             allowedOrigins: [
