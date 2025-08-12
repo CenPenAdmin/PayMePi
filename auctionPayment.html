@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi Payment Test</title>
+    <!-- Configuration -->
+    <script src="config.js"></script>
+    <!-- Pi SDK -->
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+</head>
+<body>
+    <h1>Pi Payment Test App</h1>
+    <p>Click the button below to send 1 Test Pi</p>
+    
+    <!-- Test Backend Connection -->
+    <button onclick="testBackend()" style="background: #007bff; color: white; padding: 10px; margin: 10px;">
+        Test Backend Connection
+    </button>
+    
+    <!-- Pi Authentication Button -->
+    <button id="signinButton" onclick="signIn()">Sign In with Pi</button>
+    
+    <!-- Payment Button (hidden until signed in) -->
+    <div id="paymentSection" style="display: none;">
+        <h2>Welcome!</h2>
+        <p id="userInfo">You are now signed in.</p>
+        <button id="payButton" onclick="makePayment()">Pay 1 Test Pi</button>
+        <p id="paymentStatus"></p>
+        <div id="debugInfo" style="margin-top: 20px; padding: 10px; background: #f0f0f0; font-family: monospace; font-size: 12px;">
+            <strong>Debug Information:</strong><br>
+            <div id="debugContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let piUser = null;
+        
+        // Debug function
+        function addDebugInfo(message) {
+            const debugContent = document.getElementById('debugContent');
+            const timestamp = new Date().toLocaleTimeString();
+            debugContent.innerHTML += `[${timestamp}] ${message}<br>`;
+            console.log(`[DEBUG] ${message}`);
+        }
+        
+        // Initialize Pi SDK
+        addDebugInfo('Initializing Pi SDK...');
+        
+        // Check if Pi SDK loaded properly
+        if (typeof Pi === 'undefined') {
+            addDebugInfo('❌ Pi SDK not loaded! Make sure you are using Pi Browser.');
+            alert('Error: Pi SDK not detected. Please open this app in Pi Browser.');
+        } else {
+            addDebugInfo('✅ Pi SDK loaded successfully');
+            
+            Pi.init({
+                version: CONFIG.PI_SDK.version,
+                sandbox: CONFIG.PI_SDK.sandbox
+            });
+            addDebugInfo(`Pi SDK initialized - Version: ${CONFIG.PI_SDK.version}, Sandbox: ${CONFIG.PI_SDK.sandbox}`);
+        }
+        
+        addDebugInfo(`Backend URL: ${CONFIG.BACKEND_URL}`);
+        
+        // Check browser environment
+        const userAgent = navigator.userAgent;
+        addDebugInfo(`Browser: ${userAgent}`);
+        
+        if (userAgent.includes('Pi Browser') || userAgent.includes('iPhone')) {
+            addDebugInfo('✅ Pi Browser detected');
+        } else {
+            addDebugInfo('⚠️ Not Pi Browser - authentication may not work');
+        }
+
+        // Test backend connection
+        async function testBackend() {
+            addDebugInfo('=== BACKEND CONNECTION TEST ===');
+            
+            // Test 1: Simple test endpoint (no CORS restrictions)
+            try {
+                addDebugInfo('Test 1: Simple endpoint (no CORS)...');
+                
+                const response1 = await fetch(`${CONFIG.BACKEND_URL}/simple-test`, {
+                    method: 'GET',
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (response1.ok) {
+                    const result1 = await response1.json();
+                    addDebugInfo(`✅ Simple test successful: ${result1.message}`);
+                } else {
+                    addDebugInfo(`❌ Simple test failed: ${response1.status} ${response1.statusText}`);
+                }
+                
+            } catch (error) {
+                addDebugInfo(`❌ Simple test error: ${error.message}`);
+            }
+            
+            // Test 2: Health endpoint with CORS
+            try {
+                addDebugInfo('Test 2: Health endpoint (with CORS)...');
+                
+                const response2 = await fetch(`${CONFIG.BACKEND_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (response2.ok) {
+                    const result2 = await response2.json();
+                    addDebugInfo(`✅ Health test successful: ${result2.status}`);
+                } else {
+                    addDebugInfo(`❌ Health test failed: ${response2.status} ${response2.statusText}`);
+                }
+                
+            } catch (error) {
+                addDebugInfo(`❌ Health test error: ${error.message}`);
+            }
+            
+            // Test 3: CORS test endpoint
+            try {
+                addDebugInfo('Test 3: CORS test endpoint...');
+                
+                const response3 = await fetch(`${CONFIG.BACKEND_URL}/test-cors`, {
+                    method: 'GET',
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (response3.ok) {
+                    const result3 = await response3.json();
+                    addDebugInfo(`✅ CORS test successful: ${result3.message}`);
+                } else {
+                    addDebugInfo(`❌ CORS test failed: ${response3.status} ${response3.statusText}`);
+                }
+                
+            } catch (error) {
+                addDebugInfo(`❌ CORS test error: ${error.message}`);
+            }
+            
+            addDebugInfo('=== TEST COMPLETE - Check results above ===');
+        }
+
+        // Sign in function
+        async function signIn() {
+            try {
+                addDebugInfo('Starting Pi authentication...');
+                addDebugInfo('Checking Pi SDK availability...');
+                
+                // Check if Pi SDK is available
+                if (typeof Pi === 'undefined') {
+                    throw new Error('Pi SDK not loaded. Make sure you are using Pi Browser.');
+                }
+                
+                addDebugInfo('Pi SDK detected. Checking Pi Browser environment...');
+                
+                // Check if we're in Pi Browser
+                const userAgent = navigator.userAgent;
+                addDebugInfo(`User Agent: ${userAgent}`);
+                
+                if (!userAgent.includes('Pi Browser') && !userAgent.includes('iPhone')) {
+                    addDebugInfo('⚠️ Warning: Not detected as Pi Browser. This may cause issues.');
+                }
+                
+                addDebugInfo('Attempting Pi.authenticate...');
+                
+                // Authenticate user with required scopes
+                const auth = await Pi.authenticate([
+                    'username', 
+                    'payments'
+                ], onIncompletePaymentFound);
+                
+                piUser = auth.user;
+                addDebugInfo(`Authentication successful! User: ${piUser.username}`);
+                addDebugInfo(`User UID: ${piUser.uid}`);
+                console.log('Full auth object:', auth);
+                console.log('User object:', piUser);
+                
+                // Log authentication to backend
+                try {
+                    await fetch(`${CONFIG.BACKEND_URL}/log-auth`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            username: piUser.username,
+                            userUid: piUser.uid,
+                            authSuccess: true
+                        })
+                    });
+                    addDebugInfo('Authentication logged to database');
+                } catch (logError) {
+                    addDebugInfo(`Failed to log authentication: ${logError.message}`);
+                }
+                
+                // Update UI with user information
+                document.getElementById('userInfo').innerHTML = `
+                    <strong>Welcome, ${piUser.username}!</strong><br>
+                    <small>UID: ${piUser.uid}</small>
+                `;
+                
+                // Hide sign in button and show payment section
+                document.getElementById('signinButton').style.display = 'none';
+                document.getElementById('paymentSection').style.display = 'block';
+                
+                addDebugInfo('UI updated - ready for payments');
+                
+            } catch (error) {
+                addDebugInfo(`Authentication failed: ${error.message}`);
+                console.error('Authentication failed:', error);
+                
+                // More specific error handling
+                if (error.message.includes('Pi SDK not loaded')) {
+                    alert('Error: This app must be opened in Pi Browser. Please copy the URL and open it in Pi Browser app.');
+                } else if (error.message.includes('User denied')) {
+                    alert('Pi authentication was denied. Please try again and allow access.');
+                } else if (error.message.includes('Not available')) {
+                    alert('Pi authentication not available. Make sure you are signed into Pi Browser and have developer mode enabled.');
+                } else {
+                    alert('Sign in failed: ' + error.message + '\n\nTips:\n1. Make sure you are using Pi Browser\n2. Enable Developer/Sandbox mode\n3. Clear Pi Browser cache and try again');
+                }
+            }
+        }
+
+        // Payment function
+        async function makePayment() {
+            if (!piUser) {
+                alert('Please sign in first');
+                return;
+            }
+
+            addDebugInfo(`Creating payment for user: ${piUser.username}`);
+            document.getElementById('paymentStatus').innerText = 'Creating payment...';
+
+            try {
+                // Create payment
+                const payment = await Pi.createPayment({
+                    amount: CONFIG.PAYMENT.amount,
+                    memo: CONFIG.PAYMENT.memo,
+                    metadata: { 
+                        orderId: Date.now().toString(),
+                        itemName: CONFIG.PAYMENT.defaultMetadata.itemName,
+                        username: piUser.username,
+                        uid: piUser.uid
+                    }
+                }, {
+                    onReadyForServerApproval: function(paymentId) {
+                        addDebugInfo(`Payment ready for server approval: ${paymentId}`);
+                        console.log('Payment ready for approval:', paymentId);
+                        document.getElementById('paymentStatus').innerText = 'Payment initiated. Approving...';
+                        
+                        // Send to your server for approval
+                        approvePayment(paymentId);
+                    },
+                    onReadyForServerCompletion: function(paymentId, txId) {
+                        addDebugInfo(`Payment ready for completion: ${paymentId}, TX: ${txId}`);
+                        console.log('Payment ready for completion:', paymentId, txId);
+                        document.getElementById('paymentStatus').innerText = 'Payment processing...';
+                        
+                        // Send to your server for completion
+                        completePayment(paymentId, txId);
+                    },
+                    onCancel: function(paymentId) {
+                        addDebugInfo(`Payment cancelled: ${paymentId}`);
+                        console.log('Payment cancelled:', paymentId);
+                        document.getElementById('paymentStatus').innerText = 'Payment cancelled';
+                    },
+                    onError: function(error, payment) {
+                        addDebugInfo(`Payment error: ${error.message}`);
+                        console.error('Payment error:', error);
+                        document.getElementById('paymentStatus').innerText = 'Payment failed: ' + error.message;
+                    }
+                });
+
+                addDebugInfo(`Payment created successfully: ${payment.identifier}`);
+                console.log('Payment created:', payment);
+                document.getElementById('paymentStatus').innerText = 'Payment initiated...';
+
+            } catch (error) {
+                addDebugInfo(`Payment creation failed: ${error.message}`);
+                console.error('Payment creation failed:', error);
+                document.getElementById('paymentStatus').innerText = 'Payment failed: ' + error.message;
+            }
+        }
+
+        // Handle incomplete payments (required callback)
+        function onIncompletePaymentFound(payment) {
+            console.log('Incomplete payment found:', payment);
+            // Handle incomplete payment if needed
+        }
+
+        // Approve payment on server
+        async function approvePayment(paymentId) {
+            try {
+                addDebugInfo(`Sending approval request to backend: ${paymentId}`);
+                
+                const response = await fetch(`${CONFIG.BACKEND_URL}/approve-payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true' // Skip ngrok browser warning
+                    },
+                    body: JSON.stringify({ paymentId })
+                });
+
+                addDebugInfo(`Backend approval response: ${response.status} ${response.statusText}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const result = await response.json();
+                addDebugInfo(`Payment approval result: ${JSON.stringify(result)}`);
+                console.log('Payment approval result:', result);
+                
+            } catch (error) {
+                addDebugInfo(`Payment approval failed: ${error.message}`);
+                console.error('Payment approval failed:', error);
+                document.getElementById('paymentStatus').innerText = 'Payment approval failed: ' + error.message;
+            }
+        }
+
+        // Complete payment on server
+        async function completePayment(paymentId, txId) {
+            try {
+                addDebugInfo(`Sending completion request to backend: ${paymentId}, TX: ${txId}`);
+                
+                const response = await fetch(`${CONFIG.BACKEND_URL}/complete-payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true' // Skip ngrok browser warning
+                    },
+                    body: JSON.stringify({ paymentId, txId })
+                });
+
+                addDebugInfo(`Backend completion response: ${response.status} ${response.statusText}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const result = await response.json();
+                addDebugInfo(`Payment completion result: ${JSON.stringify(result)}`);
+                console.log('Payment completion result:', result);
+                
+                if (result.success) {
+                    document.getElementById('paymentStatus').innerText = 'Payment completed successfully!';
+                    addDebugInfo('🎉 PAYMENT SUCCESSFUL!');
+                } else {
+                    document.getElementById('paymentStatus').innerText = 'Payment completion failed';
+                    addDebugInfo('❌ Payment completion failed');
+                }
+                
+            } catch (error) {
+                addDebugInfo(`Payment completion failed: ${error.message}`);
+                console.error('Payment completion failed:', error);
+                document.getElementById('paymentStatus').innerText = 'Payment completion failed: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
