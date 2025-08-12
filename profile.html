@@ -37,11 +37,9 @@
   <div id="userInfo" style="margin: 30px 0; font-size: 1.2em;"></div>
   <div id="walletInfo" style="margin: 10px 0; font-size: 1.1em;"></div>
 
-  <!-- Subscription Status Banner (hidden by default) -->
-  <div id="subscriptionBanner" style="display: none; text-align: center; margin: 20px; padding: 15px; background: linear-gradient(135deg, #28a745, #20c997); color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-    <div style="font-size: 1.1em; font-weight: bold;">🎉 Please enjoy Appraisells auctions</div>
-    <div id="subscriptionCountdown" style="margin-top: 8px; font-size: 1em;">Subscription valid until: <span id="subscriptionExpiry"></span></div>
-    <div id="daysRemaining" style="margin-top: 5px; font-size: 0.9em; opacity: 0.9;"></div>
+  <!-- Subscription Status Text (hidden by default) -->
+  <div id="subscriptionText" style="display: none; text-align: center; margin: 20px 0; font-size: 1.2em; color: #030006; font-weight: 500;">
+    Enjoy Appraisells auctions
   </div>
 
   <!-- Subscribe Button (shown only if no active subscription) -->
@@ -65,6 +63,16 @@
 
     function logout() {
       window.location.href = "index.html";
+    }
+
+    function displayWalletInfo(wallet) {
+      // Display wallet information if available
+      const walletElement = document.getElementById("walletInfo");
+      if (walletElement) {
+        walletElement.innerHTML = wallet 
+          ? `<strong>Wallet:</strong> ${wallet}`
+          : "";
+      }
     }
 
     function subscribe() {
@@ -96,9 +104,20 @@
         : "";
       displayWalletInfo(wallet);
       
-      // Check subscription status after displaying user info
+      // Check subscription status immediately after displaying user info
       if (username) {
+        console.log(`Profile page loaded for user: ${username}`);
+        // Force hide both elements initially to prevent flashing
+        document.getElementById('subscriptionText').style.display = 'none';
+        document.getElementById('subscribeSection').style.display = 'none';
+        
+        // Check subscription status
         checkSubscriptionStatus(username);
+      } else {
+        console.log('No username provided - showing subscribe button as default');
+        // No username, show subscribe button
+        document.getElementById('subscriptionText').style.display = 'none';
+        document.getElementById('subscribeSection').style.display = 'block';
       }
     }
 
@@ -122,56 +141,23 @@
         console.log('Subscription status:', result);
         
         if (result.success && result.subscribed) {
-          // User has active subscription - show banner, hide subscribe button
-          showSubscriptionBanner(result);
+          // User has active subscription - show simple text, hide subscribe button
+          document.getElementById('subscriptionText').style.display = 'block';
           document.getElementById('subscribeSection').style.display = 'none';
+          console.log(`User ${username} has active subscription - showing subscription text`);
         } else {
-          // User has no active subscription - show subscribe button, hide banner
-          document.getElementById('subscriptionBanner').style.display = 'none';
+          // User has no active subscription - show subscribe button, hide subscription text
+          document.getElementById('subscriptionText').style.display = 'none';
           document.getElementById('subscribeSection').style.display = 'block';
+          console.log(`User ${username} has no active subscription - showing subscribe button`);
         }
         
       } catch (error) {
         console.error('Failed to check subscription status:', error);
         // On error, show subscribe button (safe default)
-        document.getElementById('subscriptionBanner').style.display = 'none';
+        document.getElementById('subscriptionText').style.display = 'none';
         document.getElementById('subscribeSection').style.display = 'block';
       }
-    }
-
-    // Show subscription banner with countdown
-    function showSubscriptionBanner(subscriptionData) {
-      const banner = document.getElementById('subscriptionBanner');
-      const expirySpan = document.getElementById('subscriptionExpiry');
-      const daysSpan = document.getElementById('daysRemaining');
-      
-      // Parse expiry date
-      const expiryDate = new Date(subscriptionData.endDate);
-      const now = new Date();
-      const daysRemaining = Math.max(0, subscriptionData.daysRemaining || 0);
-      
-      // Format expiry date
-      const formattedDate = expiryDate.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-      
-      expirySpan.textContent = formattedDate;
-      
-      // Show days remaining with appropriate styling
-      if (daysRemaining > 7) {
-        daysSpan.innerHTML = `<span style="color: #ffffff;">📅 ${daysRemaining} days remaining</span>`;
-      } else if (daysRemaining > 3) {
-        daysSpan.innerHTML = `<span style="color: #fff3cd;">⚠️ ${daysRemaining} days remaining</span>`;
-      } else if (daysRemaining > 0) {
-        daysSpan.innerHTML = `<span style="color: #f8d7da;">🚨 ${daysRemaining} days remaining</span>`;
-      } else {
-        daysSpan.innerHTML = `<span style="color: #f8d7da;">🚨 Subscription expired</span>`;
-      }
-      
-      banner.style.display = 'block';
-      console.log(`Subscription banner shown: ${daysRemaining} days remaining`);
     }
 
     displayPiUserInfo();
