@@ -138,30 +138,92 @@
         // Create/update user profile in backend
         await createUserProfileIfNeeded(piUser.username, piUser.wallet, piUser.uid);
         
-        // Check subscription status for authenticated user
-        await checkSubscriptionStatus(piUser.username);
+        // Check subscription status for authenticated user and update UI accordingly
+        await checkSubscriptionStatusAndUpdateUI(piUser.username);
         
       } catch (error) {
         console.error('❌ Pi Network authentication failed:', error);
-        
-        // Show error message to user
-        document.getElementById("userInfo").innerHTML = `
-          <div style="color: red; text-align: center; margin: 20px;">
-            <strong>Authentication Required</strong><br>
-            Please open this app in Pi Browser and allow authentication.
-          </div>
-        `;
-        
-        // Hide both subscription elements and show login prompt
-        document.getElementById('subscriptionText').style.display = 'none';
-        document.getElementById('subscribeSection').innerHTML = `
-          <div style="text-align: center; margin: 20px 0;">
-            <button onclick="authenticateAndLoadProfile()" style="padding:12px 25px; font-size:1.5rem; background-color:#030006; color: white; border:none; border-radius:8px; cursor:pointer;">
-              Login with Pi Network
-            </button>
-          </div>
-        `;
+        showAuthenticationError();
       }
+    }
+
+    // Show authentication error state
+    function showAuthenticationError() {
+      console.log('🔄 Showing authentication error state...');
+      
+      // Show error message to user
+      document.getElementById("userInfo").innerHTML = `
+        <div style="color: red; text-align: center; margin: 20px;">
+          <strong>Authentication Required</strong><br>
+          Please open this app in Pi Browser and allow authentication.
+        </div>
+      `;
+      
+      // Hide subscription text
+      document.getElementById('subscriptionText').style.display = 'none';
+      
+      // Show login button instead of subscribe button
+      document.getElementById('subscribeSection').innerHTML = `
+        <div style="text-align: center; margin: 20px 0;">
+          <button onclick="authenticateAndLoadProfile()" style="padding:12px 25px; font-size:1.5rem; background-color:#030006; color: white; border:none; border-radius:8px; cursor:pointer;">
+            Login with Pi Network
+          </button>
+        </div>
+      `;
+    }
+
+    // Show subscription state based on user's subscription status
+    function showSubscriptionState(hasActiveSubscription, subscriptionData = null) {
+      console.log(`🎯 Updating UI state - hasActiveSubscription: ${hasActiveSubscription}`);
+      
+      const subscriptionTextElement = document.getElementById('subscriptionText');
+      const subscribeSectionElement = document.getElementById('subscribeSection');
+      
+      if (hasActiveSubscription) {
+        // User HAS active subscription - show "Enjoy Appraisells auctions" text
+        console.log('✅ Showing SUBSCRIBED state - "Enjoy Appraisells auctions"');
+        
+        // Reset the subscribe section to original button (in case it was changed to login)
+        subscribeSectionElement.innerHTML = `
+          <button onclick="subscribe()" id="subscribeBtn" style="padding:12px 25px; font-size:2rem; background-color:#030006; color: white; border:none; border-radius:8px; cursor:pointer;">Subscribe</button>
+        `;
+        
+        // Show subscription text, hide subscribe button
+        subscriptionTextElement.style.display = 'block';
+        subscriptionTextElement.style.visibility = 'visible';
+        subscriptionTextElement.className = 'subscription-active';
+        
+        subscribeSectionElement.style.display = 'none';
+        subscribeSectionElement.style.visibility = 'hidden';
+        subscribeSectionElement.className = 'subscription-hidden';
+        
+        console.log('🎉 SUBSCRIBED USER: Should see "Enjoy Appraisells auctions"');
+        
+      } else {
+        // User has NO active subscription - show Subscribe button
+        console.log('❌ Showing UNSUBSCRIBED state - Subscribe button');
+        
+        // Reset the subscribe section to original button (in case it was changed to login)
+        subscribeSectionElement.innerHTML = `
+          <button onclick="subscribe()" id="subscribeBtn" style="padding:12px 25px; font-size:2rem; background-color:#030006; color: white; border:none; border-radius:8px; cursor:pointer;">Subscribe</button>
+        `;
+        
+        // Hide subscription text, show subscribe button
+        subscriptionTextElement.style.display = 'none';
+        subscriptionTextElement.style.visibility = 'hidden';
+        subscriptionTextElement.className = 'subscription-hidden';
+        
+        subscribeSectionElement.style.display = 'block';
+        subscribeSectionElement.style.visibility = 'visible';
+        subscribeSectionElement.className = 'subscription-active';
+        
+        console.log('💳 UNSUBSCRIBED USER: Should see Subscribe button');
+      }
+      
+      // Final verification
+      console.log(`🔍 Final UI state verification:`);
+      console.log(`   - subscriptionText display: ${subscriptionTextElement.style.display}`);
+      console.log(`   - subscribeSection display: ${subscribeSectionElement.style.display}`);
     }
 
     // Create user profile in backend if it doesn't exist
@@ -196,8 +258,8 @@
       }
     }
 
-    // Check subscription status and update UI
-    async function checkSubscriptionStatus(username) {
+    // Check subscription status and update UI accordingly
+    async function checkSubscriptionStatusAndUpdateUI(username) {
       try {
         console.log(`🔍 Starting subscription check for: ${username}`);
         
@@ -226,57 +288,20 @@
         console.log(`🔍 result.success: ${result.success}`);
         console.log(`🔍 result.subscribed: ${result.subscribed}`);
         
+        // Use the new UI management function
         if (result.success && result.subscribed) {
-          // User has active subscription - show simple text, hide subscribe button
-          console.log(`✅ ${username} HAS active subscription - showing subscription text`);
-          console.log(`🎯 BEFORE UI UPDATE:`);
-          console.log(`   - subscriptionText display: ${document.getElementById('subscriptionText')?.style.display}`);
-          console.log(`   - subscribeSection display: ${document.getElementById('subscribeSection')?.style.display}`);
-          
-          // Force update the UI
-          const subscriptionTextElement = document.getElementById('subscriptionText');
-          const subscribeSectionElement = document.getElementById('subscribeSection');
-          
-          if (subscriptionTextElement && subscribeSectionElement) {
-            subscriptionTextElement.style.display = 'block';
-            subscriptionTextElement.style.visibility = 'visible';
-            subscribeSectionElement.style.display = 'none';
-            subscribeSectionElement.style.visibility = 'hidden';
-            
-            // Add CSS classes for extra enforcement
-            subscriptionTextElement.className = 'subscription-active';
-            subscribeSectionElement.className = 'subscription-hidden';
-            
-            console.log(`🎯 AFTER UI UPDATE:`);
-            console.log(`   - subscriptionText display: ${subscriptionTextElement.style.display}`);
-            console.log(`   - subscribeSection display: ${subscribeSectionElement.style.display}`);
-            console.log(`✅ UI SUCCESSFULLY UPDATED - SHOULD SHOW "Enjoy Appraisells auctions"`);
-          } else {
-            console.error(`❌ CRITICAL ERROR: DOM elements not found!`);
-            console.error(`   - subscriptionText element: ${subscriptionTextElement}`);
-            console.error(`   - subscribeSection element: ${subscribeSectionElement}`);
-          }
+          console.log(`✅ ${username} HAS ACTIVE SUBSCRIPTION!`);
+          showSubscriptionState(true, result);
         } else {
-          // User has no active subscription - show subscribe button, hide subscription text
-          console.log(`❌ ${username} has NO active subscription - showing subscribe button`);
-          console.log(`📋 Subscription details:`, result);
-          document.getElementById('subscriptionText').style.display = 'none';
-          document.getElementById('subscribeSection').style.display = 'block';
-          console.log(`🎯 UI Updated: subscribeSection visible, subscriptionText hidden`);
+          console.log(`❌ ${username} has no active subscription`);
+          showSubscriptionState(false, result);
         }
-        
-        // Double-check the DOM elements
-        const subscriptionTextElement = document.getElementById('subscriptionText');
-        const subscribeSectionElement = document.getElementById('subscribeSection');
-        console.log(`🔍 DOM Check - subscriptionText display: ${subscriptionTextElement?.style.display}`);
-        console.log(`🔍 DOM Check - subscribeSection display: ${subscribeSectionElement?.style.display}`);
         
       } catch (error) {
         console.error('❌ Failed to check subscription status:', error);
-        // On error, show subscribe button (safe default)
-        document.getElementById('subscriptionText').style.display = 'none';
-        document.getElementById('subscribeSection').style.display = 'block';
-        console.log(`⚠️ Error occurred - defaulting to showing subscribe button`);
+        // On error, show unsubscribed state (safe default)
+        console.log(`⚠️ Error occurred - showing unsubscribed state as default`);
+        showSubscriptionState(false);
       }
     }
 
