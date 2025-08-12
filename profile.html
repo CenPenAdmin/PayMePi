@@ -34,6 +34,10 @@
   <div id="userInfo" style="margin: 30px 0; font-size: 1.2em;"></div>
   <div id="walletInfo" style="margin: 10px 0; font-size: 1.1em;"></div>
 
+  <div style="text-align: center; margin: 20px 0;">
+    <button onclick="subscribe()" id="subscribeBtn" style="padding:12px 25px; font-size:2rem; background-color:#030006; color: white; border:none; border-radius:8px; cursor:pointer;">Subscribe</button>
+  </div>
+
   <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 40vh; cursor:pointer;" onclick="window.location.href='auctionPayment.html'">
     <span style="font-size:1.5em; color: white; margin-bottom:16px;">Auction 1 Date and Time</span>
     <img src="images/auction-kurt-cobain-item1.jpg" alt="Appraisal" style="height:240px; width:240px; object-fit:cover; border:1px solid #fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.10);">
@@ -50,6 +54,23 @@
 
     function logout() {
       window.location.href = "index.html";
+    }
+
+    function subscribe() {
+      // Get current user parameters
+      const params = new URLSearchParams(window.location.search);
+      const username = params.get("username");
+      const wallet = params.get("wallet");
+      
+      // Redirect to auctionPayment.html with user parameters
+      let redirectUrl = "auctionPayment.html";
+      if (username) {
+        redirectUrl += `?username=${encodeURIComponent(username)}`;
+        if (wallet) {
+          redirectUrl += `&wallet=${encodeURIComponent(wallet)}`;
+        }
+      }
+      window.location.href = redirectUrl;
     }
 
 
