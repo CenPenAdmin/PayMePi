@@ -296,6 +296,98 @@ async function logUserActivity(username, userUid, activityType, details = {}) {
     }
 }
 
+// Subscription Management Functions
+async function createSubscription(username, userUid, paymentId, txId, paymentData = {}) {
+    if (!db || !username) return null;
+    
+    try {
+        const startDate = new Date();
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 30); // Add 30 days
+        
+        const subscription = {
+            username,
+            userUid,
+            subscriptionType: "monthly",
+            startDate,
+            endDate,
+            paymentId,
+            txId,
+            status: "active",
+            piAmount: 1,
+            paymentData,
+            created: new Date(),
+            lastVerified: new Date()
+        };
+        
+        // Insert subscription record
+        await db.collection('user_subscriptions').insertOne(subscription);
+        
+        // Update user profile with subscription info
+        await db.collection('user_profiles').updateOne(
+            { username },
+            { 
+                $set: { 
+                    subscription: {
+                        active: true,
+                        type: "monthly",
+                        startDate: startDate,
+                        endDate: endDate,
+                        daysRemaining: 30
+                    },
+                    updated: new Date()
+                }
+            }
+        );
+        
+        // Log subscription creation activity
+        await logUserActivity(username, userUid, 'subscription_created', {
+            subscriptionType: 'monthly',
+            duration: '30_days',
+            paymentId: paymentId,
+            txId: txId,
+            endDate: endDate
+        });
+        
+        console.log(`✅ Created 30-day subscription for user: ${username}, expires: ${endDate.toISOString()}`);
+        return subscription;
+        
+    } catch (error) {
+        console.error('⚠️  Subscription creation failed:', error.message);
+        return null;
+    }
+}
+
+async function verifyActiveSubscription(username) {
+    if (!db || !username) return { subscribed: false };
+    
+    try {
+        const subscription = await db.collection('user_subscriptions').findOne({
+            username,
+            status: "active",
+            endDate: { $gt: new Date() } // Not expired
+        });
+        
+        if (subscription) {
+            const daysRemaining = Math.ceil((subscription.endDate - new Date()) / (1000 * 60 * 60 * 24));
+            return {
+                subscribed: true,
+                type: subscription.subscriptionType,
+                startDate: subscription.startDate,
+                endDate: subscription.endDate,
+                daysRemaining: Math.max(0, daysRemaining),
+                paymentId: subscription.paymentId
+            };
+        } else {
+            return { subscribed: false };
+        }
+        
+    } catch (error) {
+        console.error('⚠️  Subscription verification failed:', error.message);
+        return { subscribed: false, error: error.message };
+    }
+}
+
 // Serve the HTML page
 app.get('/', (req, res) => {
     // Log user session data
@@ -531,6 +623,10 @@ app.post('/complete-payment', async (req, res) => {
                     const userUid = existingPayment?.userInfo?.userUid;
                     const amount = data.amount || existingPayment?.paymentDetails?.amount || 0;
 
+                    // Check if this is a subscription payment
+                    const isSubscriptionPayment = data.metadata?.paymentType === 'monthly_subscription' || 
+                                                 existingPayment?.paymentDetails?.memo?.includes('subscription');
+
                     // Update user profile with completed payment stats
                     if (username !== 'unknown') {
                         // Update user profile payment totals
@@ -556,8 +652,19 @@ app.post('/complete-payment', async (req, res) => {
                             transactionVerified: data.status?.transaction_verified,
                             ip: clientIP,
                             userAgent: req.get('user-agent'),
-                            transactionLink: data.transaction?._link
+                            transactionLink: data.transaction?._link,
+                            isSubscription: isSubscriptionPayment
                         });
+
+                        // Create subscription if this is a subscription payment
+                        if (isSubscriptionPayment) {
+                            const subscription = await createSubscription(username, userUid, paymentId, txId, data);
+                            if (subscription) {
+                                console.log(`🎫 Subscription created for user: ${username}, expires: ${subscription.endDate.toISOString()}`);
+                            } else {
+                                console.error('⚠️  Failed to create subscription for completed payment');
+                            }
+                        }
                     }
 
                     await db.collection('payments').updateOne(
@@ -892,6 +999,68 @@ app.get('/user/:username', async (req, res) => {
         res.status(500).json({ 
             success: false, 
             error: 'Failed to fetch user details' 
+        });
+    }
+});
+
+// Subscription Status API Endpoints
+
+// Check subscription status for a user
+app.get('/subscription-status/:username', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const { username } = req.params;
+        const subscriptionStatus = await verifyActiveSubscription(username);
+        
+        res.json({ 
+            success: true, 
+            ...subscriptionStatus
+        });
+    } catch (error) {
+        console.error('❌ Failed to check subscription status:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to check subscription status' 
+        });
+    }
+});
+
+// Get all subscriptions (admin endpoint)
+app.get('/subscriptions', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const subscriptions = await db.collection('user_subscriptions')
+            .find()
+            .sort({ created: -1 })
+            .toArray();
+            
+        const activeSubscriptions = subscriptions.filter(sub => 
+            sub.status === 'active' && sub.endDate > new Date()
+        );
+        
+        res.json({ 
+            success: true, 
+            total: subscriptions.length,
+            active: activeSubscriptions.length,
+            subscriptions 
+        });
+    } catch (error) {
+        console.error('❌ Failed to fetch subscriptions:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch subscriptions' 
         });
     }
 });

@@ -26,9 +26,14 @@
 
     <!-- BANNER -->
      <header>
-    <h1>Appraisells Payment Test</h1>
+    <h1>Subscribe to Appraisells</h1>
     </header>
-    <p>Pay 1 Pi Coin for 30 day registry to non appraised auctions</p>
+    <div style="text-align: center; padding: 20px; margin: 20px; background: #f8f9fa; border-radius: 8px;">
+        <h2 style="color: #030006;">30-Day Subscription</h2>
+        <p style="font-size: 1.1em; margin: 10px 0;">Get unlimited access to all non-appraised auctions for 30 days</p>
+        <p style="font-size: 1em; color: #666;">✓ Browse all auction items<br>✓ Place bids on items<br>✓ Participate in live auctions</p>
+        <p style="font-size: 1.2em; font-weight: bold; color: #030006;">Only 1 Pi Coin</p>
+    </div>
     
     <!-- Pi Authentication Button (hidden by default since user is already authenticated) -->
     <button id="signinButton" onclick="signIn()" style="display: none;">Click To Allow Payment Creation</button>
@@ -37,7 +42,7 @@
 
     <div id="paymentSection" style="display: none;">
         <p id="userInfo">Loading user information...</p>
-        <button id="payButton" onclick="makePayment()">Pay 1 Test Pi to bid on these items</button>
+        <button id="payButton" onclick="makePayment()" style="padding: 15px 30px; font-size: 1.2em; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; margin: 20px 0;">Pay 1 Pi for 30-Day Subscription</button>
         <p id="paymentStatus"></p>
         <div id="debugInfo" style="margin-top: 20px; padding: 10px; background: #f0f0f0; font-family: monospace; font-size: 12px;">
             <strong>Debug Information:</strong><br>
@@ -185,6 +190,10 @@
                     ${wallet ? `<small>Wallet: ${wallet}</small>` : ''}
                 `;
                 
+                // Show payment section since user is authenticated
+                document.getElementById('paymentSection').style.display = 'block';
+                document.getElementById('signinButton').style.display = 'none';
+                
                 addDebugInfo('Payment section ready - user authenticated from profile');
                 return true;
             } else {
@@ -309,13 +318,16 @@
             document.getElementById('paymentStatus').innerText = 'Creating payment...';
 
             try {
-                // Create payment
+                // Create subscription payment
                 const payment = await Pi.createPayment({
-                    amount: CONFIG.PAYMENT.amount,
-                    memo: CONFIG.PAYMENT.memo,
+                    amount: 1, // 1 Pi for subscription
+                    memo: "30-day subscription to Appraisells non-appraised auctions",
                     metadata: { 
                         orderId: Date.now().toString(),
-                        itemName: CONFIG.PAYMENT.defaultMetadata.itemName,
+                        paymentType: "monthly_subscription",
+                        subscriptionDuration: "30_days",
+                        itemName: "30-Day Auction Access Subscription",
+                        description: "Monthly subscription to non-appraised auctions",
                         username: piUser.username,
                         uid: piUser.uid
                     }
@@ -423,11 +435,26 @@
                 console.log('Payment completion result:', result);
                 
                 if (result.success) {
-                    document.getElementById('paymentStatus').innerText = 'Payment completed successfully!';
-                    addDebugInfo('🎉 PAYMENT SUCCESSFUL!');
+                    // Show subscription success message
+                    const subscriptionEndDate = new Date();
+                    subscriptionEndDate.setDate(subscriptionEndDate.getDate() + 30); // Add 30 days
+                    
+                    document.getElementById('paymentStatus').innerHTML = `
+                        <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="color: #155724; margin: 0 0 10px 0;">🎉 Subscription Activated!</h3>
+                            <p style="margin: 5px 0;">Your 30-day subscription is now active.</p>
+                            <p style="margin: 5px 0;"><strong>Access until:</strong> ${subscriptionEndDate.toLocaleDateString()}</p>
+                            <p style="margin: 5px 0; font-size: 0.9em;">You can now bid on all non-appraised auctions!</p>
+                            <button onclick="window.location.href='profile.html?username=${encodeURIComponent(piUser.username)}${piUser.wallet ? '&wallet=' + encodeURIComponent(piUser.wallet) : ''}'" 
+                                    style="margin-top: 10px; padding: 10px 20px; background: #030006; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                                Return to Profile
+                            </button>
+                        </div>
+                    `;
+                    addDebugInfo('🎉 SUBSCRIPTION ACTIVATED!');
                 } else {
-                    document.getElementById('paymentStatus').innerText = 'Payment completion failed';
-                    addDebugInfo('❌ Payment completion failed');
+                    document.getElementById('paymentStatus').innerText = 'Subscription activation failed';
+                    addDebugInfo('❌ Subscription activation failed');
                 }
                 
             } catch (error) {
