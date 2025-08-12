@@ -29,6 +29,17 @@
       background-color: white;
     }
   
+    /* Force subscription state display */
+    .subscription-active {
+      display: block !important;
+      visibility: visible !important;
+    }
+    
+    .subscription-hidden {
+      display: none !important;
+      visibility: hidden !important;
+    }
+  
   </style>
  
 </head>
@@ -218,9 +229,33 @@
         if (result.success && result.subscribed) {
           // User has active subscription - show simple text, hide subscribe button
           console.log(`✅ ${username} HAS active subscription - showing subscription text`);
-          document.getElementById('subscriptionText').style.display = 'block';
-          document.getElementById('subscribeSection').style.display = 'none';
-          console.log(`🎯 UI Updated: subscriptionText visible, subscribeSection hidden`);
+          console.log(`🎯 BEFORE UI UPDATE:`);
+          console.log(`   - subscriptionText display: ${document.getElementById('subscriptionText')?.style.display}`);
+          console.log(`   - subscribeSection display: ${document.getElementById('subscribeSection')?.style.display}`);
+          
+          // Force update the UI
+          const subscriptionTextElement = document.getElementById('subscriptionText');
+          const subscribeSectionElement = document.getElementById('subscribeSection');
+          
+          if (subscriptionTextElement && subscribeSectionElement) {
+            subscriptionTextElement.style.display = 'block';
+            subscriptionTextElement.style.visibility = 'visible';
+            subscribeSectionElement.style.display = 'none';
+            subscribeSectionElement.style.visibility = 'hidden';
+            
+            // Add CSS classes for extra enforcement
+            subscriptionTextElement.className = 'subscription-active';
+            subscribeSectionElement.className = 'subscription-hidden';
+            
+            console.log(`🎯 AFTER UI UPDATE:`);
+            console.log(`   - subscriptionText display: ${subscriptionTextElement.style.display}`);
+            console.log(`   - subscribeSection display: ${subscribeSectionElement.style.display}`);
+            console.log(`✅ UI SUCCESSFULLY UPDATED - SHOULD SHOW "Enjoy Appraisells auctions"`);
+          } else {
+            console.error(`❌ CRITICAL ERROR: DOM elements not found!`);
+            console.error(`   - subscriptionText element: ${subscriptionTextElement}`);
+            console.error(`   - subscribeSection element: ${subscribeSectionElement}`);
+          }
         } else {
           // User has no active subscription - show subscribe button, hide subscription text
           console.log(`❌ ${username} has NO active subscription - showing subscribe button`);
