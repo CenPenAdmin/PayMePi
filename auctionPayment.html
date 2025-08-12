@@ -205,11 +205,76 @@
             }
         }
 
+        // Check if user already has active subscription
+        async function checkSubscriptionStatus() {
+            if (!piUser || !piUser.username) {
+                addDebugInfo('No user available for subscription check');
+                return;
+            }
+            
+            try {
+                addDebugInfo(`Checking subscription status for: ${piUser.username}`);
+                
+                const response = await fetch(`${CONFIG.BACKEND_URL}/subscription-status/${piUser.username}`, {
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                addDebugInfo(`Subscription check result: ${JSON.stringify(result)}`);
+                
+                if (result.success && result.subscribed) {
+                    // User already has active subscription
+                    showAlreadySubscribed(result);
+                } else {
+                    // User needs to subscribe - show payment section
+                    addDebugInfo('User needs subscription - showing payment option');
+                    document.getElementById('paymentSection').style.display = 'block';
+                }
+                
+            } catch (error) {
+                addDebugInfo(`Subscription check failed: ${error.message}`);
+                console.error('Subscription check error:', error);
+                // On error, show payment section (safe default)
+                document.getElementById('paymentSection').style.display = 'block';
+            }
+        }
+        
+        // Show already subscribed message
+        function showAlreadySubscribed(subscriptionData) {
+            const expiryDate = new Date(subscriptionData.endDate);
+            const daysRemaining = subscriptionData.daysRemaining || 0;
+            
+            document.getElementById('paymentSection').innerHTML = `
+                <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                    <h3 style="color: #155724; margin: 0 0 15px 0;">✅ You're Already Subscribed!</h3>
+                    <p style="margin: 10px 0; font-size: 1.1em;">You have an active 30-day subscription.</p>
+                    <p style="margin: 10px 0;"><strong>Subscription valid until:</strong> ${expiryDate.toLocaleDateString()}</p>
+                    <p style="margin: 10px 0; color: #28a745;"><strong>${daysRemaining} days remaining</strong></p>
+                    <p style="margin: 15px 0; font-size: 0.9em; color: #666;">You can bid on all non-appraised auctions!</p>
+                    <button onclick="window.location.href='profile.html?username=${encodeURIComponent(piUser.username)}${piUser.wallet ? '&wallet=' + encodeURIComponent(piUser.wallet) : ''}'" 
+                            style="margin-top: 15px; padding: 12px 25px; background: #030006; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1em;">
+                        Return to Profile
+                    </button>
+                </div>
+            `;
+            document.getElementById('paymentSection').style.display = 'block';
+            addDebugInfo('✅ Already subscribed message shown');
+        }
+
         // Initialize page - try to load user from URL params first
         window.addEventListener('load', function() {
             addDebugInfo('Page loaded - checking for user credentials...');
             
-            if (!loadUserFromParams()) {
+            if (loadUserFromParams()) {
+                // User loaded from params, now check subscription status
+                checkSubscriptionStatus();
+            } else {
                 addDebugInfo('User not pre-authenticated - sign in required');
             }
         });
@@ -435,6 +500,9 @@
                 console.log('Payment completion result:', result);
                 
                 if (result.success) {
+                    // Hide payment button to prevent further payments
+                    document.getElementById('payButton').style.display = 'none';
+                    
                     // Show subscription success message
                     const subscriptionEndDate = new Date();
                     subscriptionEndDate.setDate(subscriptionEndDate.getDate() + 30); // Add 30 days

@@ -107,9 +107,14 @@
       try {
         console.log(`Checking subscription status for: ${username}`);
         
-        const response = await fetch(`${CONFIG.BACKEND_URL}/subscription-status/${username}`, {
+        // Add cache busting to ensure fresh data
+        const timestamp = Date.now();
+        const response = await fetch(`${CONFIG.BACKEND_URL}/subscription-status/${username}?t=${timestamp}`, {
           headers: {
-            'ngrok-skip-browser-warning': 'true'
+            'ngrok-skip-browser-warning': 'true',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
           }
         });
         const result = await response.json();
