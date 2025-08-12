@@ -1068,6 +1068,250 @@ app.get('/subscriptions', async (req, res) => {
     }
 });
 
+// ===== SUBSCRIPTION MANAGEMENT ENDPOINTS =====
+
+// Get subscription overview/dashboard
+app.get('/subscriptions/overview', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const subscriptions = await db.collection('user_subscriptions').find().toArray();
+        const now = new Date();
+        
+        // Calculate statistics
+        const stats = {
+            total: subscriptions.length,
+            active: subscriptions.filter(sub => sub.isActive && new Date(sub.endDate) > now).length,
+            expired: subscriptions.filter(sub => new Date(sub.endDate) <= now).length,
+            inactive: subscriptions.filter(sub => !sub.isActive).length,
+            totalRevenue: subscriptions.filter(sub => sub.isActive).length * 1, // 1 Pi per subscription
+            thisMonth: subscriptions.filter(sub => {
+                const subDate = new Date(sub.startDate);
+                const thisMonth = new Date();
+                return subDate.getMonth() === thisMonth.getMonth() && subDate.getFullYear() === thisMonth.getFullYear();
+            }).length
+        };
+        
+        // Recent subscriptions (last 10)
+        const recentSubscriptions = subscriptions
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, 10)
+            .map(sub => ({
+                username: sub.username,
+                startDate: sub.startDate,
+                endDate: sub.endDate,
+                isActive: sub.isActive,
+                daysRemaining: Math.max(0, Math.ceil((new Date(sub.endDate) - now) / (1000 * 60 * 60 * 24))),
+                paymentId: sub.paymentId
+            }));
+        
+        res.json({ 
+            success: true, 
+            stats,
+            recentSubscriptions
+        });
+        
+    } catch (error) {
+        console.error('❌ Failed to fetch subscription overview:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch subscription overview' 
+        });
+    }
+});
+
+// Get subscription by ID
+app.get('/subscriptions/:subscriptionId', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const { subscriptionId } = req.params;
+        const subscription = await db.collection('user_subscriptions').findOne({ 
+            $or: [
+                { _id: subscriptionId },
+                { paymentId: subscriptionId }
+            ]
+        });
+        
+        if (!subscription) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Subscription not found' 
+            });
+        }
+        
+        // Calculate additional details
+        const now = new Date();
+        const endDate = new Date(subscription.endDate);
+        const daysRemaining = Math.max(0, Math.ceil((endDate - now) / (1000 * 60 * 60 * 24)));
+        const isExpired = endDate <= now;
+        
+        res.json({ 
+            success: true, 
+            subscription: {
+                ...subscription,
+                daysRemaining,
+                isExpired,
+                status: isExpired ? 'expired' : (subscription.isActive ? 'active' : 'inactive')
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Failed to fetch subscription:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch subscription' 
+        });
+    }
+});
+
+// Update subscription status (admin)
+app.put('/subscriptions/:subscriptionId', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const { subscriptionId } = req.params;
+        const { isActive, endDate, notes } = req.body;
+        
+        const updateData = {
+            updatedAt: new Date()
+        };
+        
+        if (typeof isActive === 'boolean') updateData.isActive = isActive;
+        if (endDate) updateData.endDate = new Date(endDate);
+        if (notes) updateData.adminNotes = notes;
+        
+        const result = await db.collection('user_subscriptions').updateOne(
+            { 
+                $or: [
+                    { _id: subscriptionId },
+                    { paymentId: subscriptionId }
+                ]
+            },
+            { $set: updateData }
+        );
+        
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Subscription not found' 
+            });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Subscription updated successfully',
+            updated: result.modifiedCount > 0
+        });
+        
+    } catch (error) {
+        console.error('❌ Failed to update subscription:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to update subscription' 
+        });
+    }
+});
+
+// Delete subscription (admin)
+app.delete('/subscriptions/:subscriptionId', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const { subscriptionId } = req.params;
+        
+        const result = await db.collection('user_subscriptions').deleteOne({ 
+            $or: [
+                { _id: subscriptionId },
+                { paymentId: subscriptionId }
+            ]
+        });
+        
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Subscription not found' 
+            });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Subscription deleted successfully'
+        });
+        
+    } catch (error) {
+        console.error('❌ Failed to delete subscription:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to delete subscription' 
+        });
+    }
+});
+
+// Get expiring subscriptions (within next 7 days)
+app.get('/subscriptions/expiring/soon', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const now = new Date();
+        const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        
+        const expiringSubscriptions = await db.collection('user_subscriptions')
+            .find({
+                isActive: true,
+                endDate: {
+                    $gte: now,
+                    $lte: sevenDaysFromNow
+                }
+            })
+            .sort({ endDate: 1 })
+            .toArray();
+        
+        const subscriptionsWithDays = expiringSubscriptions.map(sub => ({
+            ...sub,
+            daysRemaining: Math.ceil((new Date(sub.endDate) - now) / (1000 * 60 * 60 * 24))
+        }));
+        
+        res.json({ 
+            success: true, 
+            count: expiringSubscriptions.length,
+            subscriptions: subscriptionsWithDays
+        });
+        
+    } catch (error) {
+        console.error('❌ Failed to fetch expiring subscriptions:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch expiring subscriptions' 
+        });
+    }
+});
+
 // Manual migration endpoint
 app.post('/migrate-data', async (req, res) => {
     if (!db) {
