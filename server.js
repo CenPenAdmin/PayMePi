@@ -625,7 +625,10 @@ app.post('/complete-payment', async (req, res) => {
 
                     // Check if this is a subscription payment
                     const isSubscriptionPayment = data.metadata?.paymentType === 'monthly_subscription' || 
-                                                 existingPayment?.paymentDetails?.memo?.includes('subscription');
+                                                 data.memo?.includes('subscription') ||
+                                                 existingPayment?.paymentDetails?.memo?.includes('subscription') ||
+                                                 data.memo?.includes('30-day') ||
+                                                 data.memo?.includes('Appraisells');
 
                     // Update user profile with completed payment stats
                     if (username !== 'unknown') {
