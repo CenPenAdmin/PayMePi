@@ -10,21 +10,21 @@
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
 <body>
-    <h1>Pi Payment Test App</h1>
-    <p>Click the button below to send 1 Test Pi</p>
+    <h1>Appraisells Payment Test</h1>
+    <p>Pay 1 Pi Coin to bid on these items in Appraisells Live Auction</p>
     
     <!-- Test Backend Connection -->
     <button onclick="testBackend()" style="background: #007bff; color: white; padding: 10px; margin: 10px;">
         Test Backend Connection
     </button>
     
-    <!-- Pi Authentication Button -->
-    <button id="signinButton" onclick="signIn()">Sign In with Pi</button>
+    <!-- Pi Authentication Button (hidden by default since user is already authenticated) -->
+    <button id="signinButton" onclick="signIn()" style="display: none;">Sign In with Pi</button>
     
-    <!-- Payment Button (hidden until signed in) -->
-    <div id="paymentSection" style="display: none;">
+    <!-- Payment Section (shown by default since user is authenticated) -->
+    <div id="paymentSection">
         <h2>Welcome!</h2>
-        <p id="userInfo">You are now signed in.</p>
+        <p id="userInfo">Loading user information...</p>
         <button id="payButton" onclick="makePayment()">Pay 1 Test Pi</button>
         <p id="paymentStatus"></p>
         <div id="debugInfo" style="margin-top: 20px; padding: 10px; background: #f0f0f0; font-family: monospace; font-size: 12px;">
@@ -146,7 +146,49 @@
             addDebugInfo('=== TEST COMPLETE - Check results above ===');
         }
 
-        // Sign in function
+        // Load user credentials from URL parameters (passed from profile.html)
+        function loadUserFromParams() {
+            const params = new URLSearchParams(window.location.search);
+            const username = params.get('username');
+            const wallet = params.get('wallet');
+            
+            if (username) {
+                // User credentials available from profile.html
+                piUser = {
+                    username: username,
+                    wallet: wallet,
+                    uid: 'from_profile' // We'll get the real UID if needed
+                };
+                
+                addDebugInfo(`✅ User loaded from profile: ${username}`);
+                
+                // Update UI with user information
+                document.getElementById('userInfo').innerHTML = `
+                    <strong>Welcome, ${piUser.username}!</strong><br>
+                    ${wallet ? `<small>Wallet: ${wallet}</small>` : ''}
+                `;
+                
+                addDebugInfo('Payment section ready - user authenticated from profile');
+                return true;
+            } else {
+                addDebugInfo('⚠️ No user credentials in URL - showing sign in button');
+                // Show sign in button if no credentials
+                document.getElementById('signinButton').style.display = 'block';
+                document.getElementById('paymentSection').style.display = 'none';
+                return false;
+            }
+        }
+
+        // Initialize page - try to load user from URL params first
+        window.addEventListener('load', function() {
+            addDebugInfo('Page loaded - checking for user credentials...');
+            
+            if (!loadUserFromParams()) {
+                addDebugInfo('User not pre-authenticated - sign in required');
+            }
+        });
+
+        // Sign in function (only used if user wasn't pre-authenticated)
         async function signIn() {
             try {
                 addDebugInfo('Starting Pi authentication...');
@@ -225,14 +267,25 @@
                 } else {
                     alert('Sign in failed: ' + error.message + '\n\nTips:\n1. Make sure you are using Pi Browser\n2. Enable Developer/Sandbox mode\n3. Clear Pi Browser cache and try again');
                 }
+                throw error; // Re-throw for makePayment function
             }
         }
 
         // Payment function
         async function makePayment() {
-            if (!piUser) {
-                alert('Please sign in first');
-                return;
+            // If piUser doesn't have full Pi authentication, we need to authenticate first
+            if (!piUser || piUser.uid === 'from_profile') {
+                addDebugInfo('Need full Pi authentication for payment...');
+                try {
+                    await signIn();
+                    if (!piUser) {
+                        alert('Please sign in first');
+                        return;
+                    }
+                } catch (error) {
+                    alert('Authentication required for payment: ' + error.message);
+                    return;
+                }
             }
 
             addDebugInfo(`Creating payment for user: ${piUser.username}`);
