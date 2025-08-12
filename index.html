@@ -66,17 +66,8 @@
     // Manual login removed
     
     function login() {
-  Pi.authenticate(['username', 'payments'])
-    .then(auth => {
-      const user = auth.user;
-      // Show Pi username and wallet info
-      // Redirect to profile.html with Pi username and wallet as query params
-      window.location.href = `profile.html?username=${encodeURIComponent(user.username)}${user.wallet ? `&wallet=${encodeURIComponent(user.wallet)}` : ''}`;
-    })
-    .catch(err => {
-      console.error("Login failed:", err);
-      alert("Please open this app in the Pi Browser and try again.");
-    });
+  // Simply redirect to profile page - it will handle its own Pi authentication
+  window.location.href = 'profile.html';
 }
     
   </script>

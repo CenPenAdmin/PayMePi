@@ -7,6 +7,9 @@
   
   <!-- Configuration -->
   <script src="config.js"></script>
+  
+  <!-- Pi SDK -->
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 
   <style>
   
@@ -59,6 +62,7 @@
   
 
   <script>
+    let piUser = null; // Will hold the authenticated Pi user
     
 
     function logout() {
@@ -76,56 +80,81 @@
     }
 
     function subscribe() {
-      // Get current user parameters
-      const params = new URLSearchParams(window.location.search);
-      const username = params.get("username");
-      const wallet = params.get("wallet");
+      // Use authenticated Pi user for subscription
+      if (!piUser) {
+        alert('Please authenticate with Pi Network first');
+        return;
+      }
       
-      // Redirect to auctionPayment.html with user parameters
+      // Redirect to auctionPayment.html with Pi user parameters
       let redirectUrl = "auctionPayment.html";
-      if (username) {
-        redirectUrl += `?username=${encodeURIComponent(username)}`;
-        if (wallet) {
-          redirectUrl += `&wallet=${encodeURIComponent(wallet)}`;
-        }
+      redirectUrl += `?username=${encodeURIComponent(piUser.username)}`;
+      if (piUser.wallet) {
+        redirectUrl += `&wallet=${encodeURIComponent(piUser.wallet)}`;
       }
       window.location.href = redirectUrl;
     }
 
-
-
-    // Display Pi user info from query params
-    function displayPiUserInfo() {
-      const params = new URLSearchParams(window.location.search);
-      const username = params.get("username");
-      const wallet = params.get("wallet");
-      document.getElementById("userInfo").innerHTML = username
-        ? `<strong>Username:</strong> ${username}`
-        : "";
-      displayWalletInfo(wallet);
-      
-      // Check subscription status immediately after displaying user info
-      if (username) {
-        console.log(`Profile page loaded for user: ${username}`);
-        // Force hide both elements initially to prevent flashing
-        document.getElementById('subscriptionText').style.display = 'none';
-        document.getElementById('subscribeSection').style.display = 'none';
+    // Authenticate with Pi Network and load user profile
+    async function authenticateAndLoadProfile() {
+      try {
+        console.log('🔐 Starting Pi Network authentication...');
         
-        // First, ensure user profile exists in backend
-        createUserProfileIfNeeded(username, wallet).then(() => {
-          // Then check subscription status
-          checkSubscriptionStatus(username);
+        // Check if Pi SDK is available
+        if (typeof Pi === 'undefined') {
+          throw new Error('Pi SDK not loaded. Please open this app in Pi Browser.');
+        }
+        
+        // Initialize Pi SDK
+        Pi.init({
+          version: "2.0",
+          sandbox: true
         });
-      } else {
-        console.log('No username provided - showing subscribe button as default');
-        // No username, show subscribe button
+        
+        console.log('🔐 Pi SDK initialized, authenticating user...');
+        
+        // Authenticate user with Pi Network
+        const auth = await Pi.authenticate(['username', 'payments']);
+        piUser = auth.user;
+        
+        console.log(`✅ Pi Network authentication successful! User: ${piUser.username}`);
+        console.log('Full Pi user object:', piUser);
+        
+        // Display user information
+        document.getElementById("userInfo").innerHTML = `<strong>Username:</strong> ${piUser.username}`;
+        displayWalletInfo(piUser.wallet);
+        
+        // Create/update user profile in backend
+        await createUserProfileIfNeeded(piUser.username, piUser.wallet, piUser.uid);
+        
+        // Check subscription status for authenticated user
+        await checkSubscriptionStatus(piUser.username);
+        
+      } catch (error) {
+        console.error('❌ Pi Network authentication failed:', error);
+        
+        // Show error message to user
+        document.getElementById("userInfo").innerHTML = `
+          <div style="color: red; text-align: center; margin: 20px;">
+            <strong>Authentication Required</strong><br>
+            Please open this app in Pi Browser and allow authentication.
+          </div>
+        `;
+        
+        // Hide both subscription elements and show login prompt
         document.getElementById('subscriptionText').style.display = 'none';
-        document.getElementById('subscribeSection').style.display = 'block';
+        document.getElementById('subscribeSection').innerHTML = `
+          <div style="text-align: center; margin: 20px 0;">
+            <button onclick="authenticateAndLoadProfile()" style="padding:12px 25px; font-size:1.5rem; background-color:#030006; color: white; border:none; border-radius:8px; cursor:pointer;">
+              Login with Pi Network
+            </button>
+          </div>
+        `;
       }
     }
 
     // Create user profile in backend if it doesn't exist
-    async function createUserProfileIfNeeded(username, wallet) {
+    async function createUserProfileIfNeeded(username, wallet, userUid) {
       try {
         console.log(`🔄 Ensuring user profile exists for: ${username}`);
         
@@ -138,7 +167,7 @@
           body: JSON.stringify({
             username: username,
             wallet: wallet,
-            userUid: 'pi_network_user' // We don't have the real UID here, but that's OK
+            userUid: userUid
           })
         });
         
@@ -216,7 +245,17 @@
       }
     }
 
-    displayPiUserInfo();
+    // Initialize page with Pi Network authentication
+    window.addEventListener('load', function() {
+      console.log('🔄 Profile page loaded - starting Pi Network authentication...');
+      
+      // Hide both elements initially
+      document.getElementById('subscriptionText').style.display = 'none';
+      document.getElementById('subscribeSection').style.display = 'none';
+      
+      // Start Pi Network authentication
+      authenticateAndLoadProfile();
+    });
 
    
 
