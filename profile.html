@@ -74,6 +74,10 @@
   <div id="debugInfo" style="margin-top: 30px; padding: 15px; background: #f0f0f0; border-radius: 8px; font-family: monospace; font-size: 12px;">
     <strong>🔍 Profile Debug Information:</strong><br>
     <div id="debugContent"></div>
+    <!-- Test Backend Connection -->
+    <button onclick="testBackendConnection()" style="background: #007bff; color: white; padding: 8px 15px; margin: 10px 0; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">
+      Test Backend Connection
+    </button>
   </div>
 
   <script>
@@ -96,6 +100,57 @@
       addDebugInfo('✅ Pi Browser detected');
     } else {
       addDebugInfo('⚠️ Not Pi Browser - authentication may not work');
+    }
+    
+    // Test backend connection
+    async function testBackendConnection() {
+      addDebugInfo('=== BACKEND CONNECTION TEST ===');
+      
+      // Test 1: Simple health endpoint
+      try {
+        addDebugInfo('Test 1: Health endpoint...');
+        
+        const response1 = await fetch(`${CONFIG.BACKEND_URL}/health`, {
+          method: 'GET',
+          headers: {
+            'ngrok-skip-browser-warning': 'true'
+          }
+        });
+        
+        if (response1.ok) {
+          const result1 = await response1.json();
+          addDebugInfo(`✅ Health test successful: ${result1.status}`);
+        } else {
+          addDebugInfo(`❌ Health test failed: ${response1.status} ${response1.statusText}`);
+        }
+        
+      } catch (error) {
+        addDebugInfo(`❌ Health test error: ${error.message}`);
+      }
+      
+      // Test 2: Direct subscription check for this3is2ridiculous
+      try {
+        addDebugInfo('Test 2: Direct subscription check...');
+        
+        const response2 = await fetch(`${CONFIG.BACKEND_URL}/subscription-status/this3is2ridiculous`, {
+          method: 'GET',
+          headers: {
+            'ngrok-skip-browser-warning': 'true'
+          }
+        });
+        
+        if (response2.ok) {
+          const result2 = await response2.json();
+          addDebugInfo(`✅ Subscription test successful: ${JSON.stringify(result2)}`);
+        } else {
+          addDebugInfo(`❌ Subscription test failed: ${response2.status} ${response2.statusText}`);
+        }
+        
+      } catch (error) {
+        addDebugInfo(`❌ Subscription test error: ${error.message}`);
+      }
+      
+      addDebugInfo('=== TEST COMPLETE ===');
     }
     
 
@@ -338,7 +393,10 @@
         addDebugInfo(`📡 Fetching from: ${url}`);
         console.log(`📡 Fetching from: ${url}`);
         
+        addDebugInfo(`🔧 Preparing fetch request with headers...`);
+        
         const response = await fetch(url, {
+          method: 'GET',
           headers: {
             'ngrok-skip-browser-warning': 'true',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -348,12 +406,15 @@
         });
         
         addDebugInfo(`📬 Response status: ${response.status}`);
+        addDebugInfo(`📬 Response ok: ${response.ok}`);
+        addDebugInfo(`📬 Response statusText: ${response.statusText}`);
         console.log(`📬 Response status: ${response.status}`);
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
+        addDebugInfo(`🔄 Parsing response JSON...`);
         const result = await response.json();
         addDebugInfo(`📊 Raw subscription result: ${JSON.stringify(result)}`);
         addDebugInfo(`🔍 result.success: ${result.success}`);
@@ -375,7 +436,34 @@
         
       } catch (error) {
         addDebugInfo(`❌ Failed to check subscription status: ${error.message}`);
+        addDebugInfo(`❌ Error name: ${error.name}`);
+        addDebugInfo(`❌ Error stack: ${error.stack}`);
         console.error('❌ Failed to check subscription status:', error);
+        console.error('❌ Full error object:', error);
+        
+        // Try a simpler request as fallback
+        addDebugInfo(`🔄 Attempting simplified fallback request...`);
+        try {
+          const fallbackResponse = await fetch(`${CONFIG.BACKEND_URL}/subscription-status/${username}`, {
+            headers: {
+              'ngrok-skip-browser-warning': 'true'
+            }
+          });
+          
+          if (fallbackResponse.ok) {
+            const fallbackResult = await fallbackResponse.json();
+            addDebugInfo(`✅ Fallback request succeeded: ${JSON.stringify(fallbackResult)}`);
+            
+            if (fallbackResult.success && fallbackResult.subscribed) {
+              addDebugInfo(`✅ FALLBACK: ${username} HAS ACTIVE SUBSCRIPTION!`);
+              showSubscriptionState(true, fallbackResult);
+              return;
+            }
+          }
+        } catch (fallbackError) {
+          addDebugInfo(`❌ Fallback request also failed: ${fallbackError.message}`);
+        }
+        
         // On error, show unsubscribed state (safe default)
         addDebugInfo(`⚠️ Error occurred - showing unsubscribed state as default`);
         console.log(`⚠️ Error occurred - showing unsubscribed state as default`);
