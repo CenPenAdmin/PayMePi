@@ -159,11 +159,14 @@
     // Check subscription status and update UI
     async function checkSubscriptionStatus(username) {
       try {
-        console.log(`Checking subscription status for: ${username}`);
+        console.log(`🔍 Starting subscription check for: ${username}`);
         
         // Add cache busting to ensure fresh data
         const timestamp = Date.now();
-        const response = await fetch(`${CONFIG.BACKEND_URL}/subscription-status/${username}?t=${timestamp}`, {
+        const url = `${CONFIG.BACKEND_URL}/subscription-status/${username}?t=${timestamp}`;
+        console.log(`📡 Fetching from: ${url}`);
+        
+        const response = await fetch(url, {
           headers: {
             'ngrok-skip-browser-warning': 'true',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -171,27 +174,45 @@
             'Expires': '0'
           }
         });
-        const result = await response.json();
         
-        console.log('Subscription status:', result);
+        console.log(`📬 Response status: ${response.status}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        console.log(`📊 Full subscription result:`, result);
+        console.log(`🔍 result.success: ${result.success}`);
+        console.log(`🔍 result.subscribed: ${result.subscribed}`);
         
         if (result.success && result.subscribed) {
           // User has active subscription - show simple text, hide subscribe button
+          console.log(`✅ ${username} HAS active subscription - showing subscription text`);
           document.getElementById('subscriptionText').style.display = 'block';
           document.getElementById('subscribeSection').style.display = 'none';
-          console.log(`User ${username} has active subscription - showing subscription text`);
+          console.log(`🎯 UI Updated: subscriptionText visible, subscribeSection hidden`);
         } else {
           // User has no active subscription - show subscribe button, hide subscription text
+          console.log(`❌ ${username} has NO active subscription - showing subscribe button`);
+          console.log(`📋 Subscription details:`, result);
           document.getElementById('subscriptionText').style.display = 'none';
           document.getElementById('subscribeSection').style.display = 'block';
-          console.log(`User ${username} has no active subscription - showing subscribe button`);
+          console.log(`🎯 UI Updated: subscribeSection visible, subscriptionText hidden`);
         }
         
+        // Double-check the DOM elements
+        const subscriptionTextElement = document.getElementById('subscriptionText');
+        const subscribeSectionElement = document.getElementById('subscribeSection');
+        console.log(`🔍 DOM Check - subscriptionText display: ${subscriptionTextElement?.style.display}`);
+        console.log(`🔍 DOM Check - subscribeSection display: ${subscribeSectionElement?.style.display}`);
+        
       } catch (error) {
-        console.error('Failed to check subscription status:', error);
+        console.error('❌ Failed to check subscription status:', error);
         // On error, show subscribe button (safe default)
         document.getElementById('subscriptionText').style.display = 'none';
         document.getElementById('subscribeSection').style.display = 'block';
+        console.log(`⚠️ Error occurred - defaulting to showing subscribe button`);
       }
     }
 

@@ -1401,6 +1401,58 @@ app.get('/subscriptions/expiring/soon', async (req, res) => {
     }
 });
 
+// TEST ENDPOINT - Create test subscription for debugging
+app.post('/test-create-subscription', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const { username } = req.body;
+        
+        if (!username) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Username is required' 
+            });
+        }
+        
+        console.log(`🧪 Creating TEST subscription for: ${username}`);
+        
+        // Create a test subscription
+        const subscription = {
+            username,
+            paymentId: `test-subscription-${Date.now()}`,
+            subscriptionType: "monthly",
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+            isActive: true,
+            status: "active",
+            createdAt: new Date(),
+            testSubscription: true // Mark as test
+        };
+        
+        await db.collection('user_subscriptions').insertOne(subscription);
+        console.log(`✅ TEST subscription created for: ${username}`);
+        
+        res.json({ 
+            success: true, 
+            message: 'Test subscription created successfully',
+            subscription
+        });
+        
+    } catch (error) {
+        console.error('❌ Failed to create test subscription:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to create test subscription' 
+        });
+    }
+});
+
 // Manual migration endpoint
 app.post('/migrate-data', async (req, res) => {
     if (!db) {
