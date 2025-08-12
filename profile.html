@@ -111,13 +111,48 @@
         document.getElementById('subscriptionText').style.display = 'none';
         document.getElementById('subscribeSection').style.display = 'none';
         
-        // Check subscription status
-        checkSubscriptionStatus(username);
+        // First, ensure user profile exists in backend
+        createUserProfileIfNeeded(username, wallet).then(() => {
+          // Then check subscription status
+          checkSubscriptionStatus(username);
+        });
       } else {
         console.log('No username provided - showing subscribe button as default');
         // No username, show subscribe button
         document.getElementById('subscriptionText').style.display = 'none';
         document.getElementById('subscribeSection').style.display = 'block';
+      }
+    }
+
+    // Create user profile in backend if it doesn't exist
+    async function createUserProfileIfNeeded(username, wallet) {
+      try {
+        console.log(`🔄 Ensuring user profile exists for: ${username}`);
+        
+        const response = await fetch(`${CONFIG.BACKEND_URL}/create-user-profile`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+          },
+          body: JSON.stringify({
+            username: username,
+            wallet: wallet,
+            userUid: 'pi_network_user' // We don't have the real UID here, but that's OK
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log(`✅ User profile ready for: ${username}`);
+        } else {
+          console.warn(`⚠️ Profile creation failed for ${username}:`, result.error);
+        }
+        
+      } catch (error) {
+        console.error('❌ Failed to create user profile:', error);
+        // Don't block subscription checking if this fails
       }
     }
 

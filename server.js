@@ -1019,7 +1019,10 @@ app.get('/subscription-status/:username', async (req, res) => {
 
     try {
         const { username } = req.params;
+        console.log(`🔍 Checking subscription status for: ${username}`);
+        
         const subscriptionStatus = await verifyActiveSubscription(username);
+        console.log(`📊 Subscription result for ${username}:`, subscriptionStatus);
         
         res.json({ 
             success: true, 
@@ -1030,6 +1033,92 @@ app.get('/subscription-status/:username', async (req, res) => {
         res.status(500).json({ 
             success: false, 
             error: 'Failed to check subscription status' 
+        });
+    }
+});
+
+// Create user profile from Pi authentication (called when user first logs in)
+app.post('/create-user-profile', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const { username, userUid, wallet } = req.body;
+        
+        if (!username) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Username is required' 
+            });
+        }
+        
+        console.log(`👤 Creating/updating user profile for: ${username}`);
+        
+        // Check if profile already exists
+        const existingProfile = await db.collection('user_profiles').findOne({ username });
+        
+        if (existingProfile) {
+            // Update existing profile with latest login
+            await db.collection('user_profiles').updateOne(
+                { username },
+                { 
+                    $set: {
+                        'profile.lastSeen': new Date(),
+                        'profile.totalLogins': (existingProfile.profile?.totalLogins || 0) + 1,
+                        userUid: userUid || existingProfile.userUid,
+                        wallet: wallet || existingProfile.wallet,
+                        updated: new Date()
+                    }
+                }
+            );
+            
+            console.log(`✅ Updated existing profile for: ${username}`);
+        } else {
+            // Create new profile
+            await db.collection('user_profiles').insertOne({
+                username,
+                userUid: userUid || 'pi_network_user',
+                wallet: wallet || null,
+                profile: {
+                    firstSeen: new Date(),
+                    lastSeen: new Date(),
+                    totalLogins: 1,
+                    totalPayments: 0,
+                    totalAmountPaid: 0,
+                    lastPayment: null,
+                    ipAddresses: [],
+                    userAgents: []
+                },
+                created: new Date(),
+                updated: new Date(),
+                source: 'pi_network_authentication'
+            });
+            
+            console.log(`✅ Created new profile for: ${username}`);
+        }
+        
+        // Log authentication activity
+        await logUserActivity(username, userUid, 'authentication', {
+            source: 'pi_network',
+            wallet: wallet,
+            timestamp: new Date()
+        });
+        
+        res.json({ 
+            success: true, 
+            message: 'User profile created/updated successfully',
+            username 
+        });
+        
+    } catch (error) {
+        console.error('❌ Failed to create user profile:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to create user profile' 
         });
     }
 });
