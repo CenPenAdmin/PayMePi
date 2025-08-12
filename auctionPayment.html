@@ -8,10 +8,27 @@
     <script src="config.js"></script>
     <!-- Pi SDK -->
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    <style>
+        header {
+      background-color: #030006;
+      padding: 20px 0;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 3.5em;
+      color: white;
+      text-align: center;
+    }
+    </style>
 </head>
 <body>
+
+    <!-- BANNER -->
+     <header>
     <h1>Appraisells Payment Test</h1>
-    <p>Pay 1 Pi Coin to bid on these items in Appraisells Live Auction</p>
+    </header>
+    <p>Pay 1 Pi Coin for 30 day registry to non appraised auctions</p>
     
     <!-- Pi Authentication Button (hidden by default since user is already authenticated) -->
     <button id="signinButton" onclick="signIn()" style="display: none;">Click To Allow Payment Creation</button>
