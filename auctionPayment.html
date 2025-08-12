@@ -13,16 +13,12 @@
     <h1>Appraisells Payment Test</h1>
     <p>Pay 1 Pi Coin to bid on these items in Appraisells Live Auction</p>
     
-    <!-- Test Backend Connection -->
-    <button onclick="testBackend()" style="background: #007bff; color: white; padding: 10px; margin: 10px;">
-        Test Backend Connection
-    </button>
-    
     <!-- Pi Authentication Button (hidden by default since user is already authenticated) -->
-    <button id="signinButton" onclick="signIn()" style="display: none;">Sign In with Pi</button>
-    
-    <!-- Payment Section (shown by default since user is authenticated) -->
-    <div id="paymentSection">
+    <button id="signinButton" onclick="signIn()" style="display: none;">Click To Allow Payment Creation</button>
+
+
+
+    <div id="paymentSection" style="display: none;">
         <h2>Welcome!</h2>
         <p id="userInfo">Loading user information...</p>
         <button id="payButton" onclick="makePayment()">Pay 1 Test Pi</button>
@@ -32,6 +28,11 @@
             <div id="debugContent"></div>
         </div>
     </div>
+
+     <!-- Test Backend Connection -->
+    <button onclick="testBackend()" style="background: #007bff; color: white; padding: 10px; margin: 10px;">
+        Test Backend Connection
+    </button>
 
     <script>
         let piUser = null;
