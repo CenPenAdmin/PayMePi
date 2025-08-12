@@ -5,6 +5,16 @@ npm-debug.log*
 # Environment variables
 .env
 
+# Documentation with potentially sensitive data
+USER_PROFILE_SYSTEM.md
+MONGODB_SETUP.md
+
+# Any files containing actual user data or sensitive information
+*_ACTUAL_DATA.md
+*_SENSITIVE.md
+user_data_*
+migration_results_*
+
 # OS generated files
 .DS_Store
 .DS_Store?

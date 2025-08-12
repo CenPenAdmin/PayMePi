@@ -100,6 +100,202 @@ async function connectToMongoDB() {
 // Initialize MongoDB connection
 connectToMongoDB();
 
+// Data Migration Function - Migrate existing payments to new user-centric structure
+async function migrateExistingData() {
+    if (!db) {
+        console.log('⚠️  Database not connected - skipping migration');
+        return;
+    }
+
+    try {
+        console.log('🔄 Starting data migration to user-centric structure...');
+
+        // Get all existing payments
+        const existingPayments = await db.collection('payments').find().toArray();
+        console.log(`📊 Found ${existingPayments.length} existing payments to migrate`);
+
+        let migratedUsers = 0;
+        const processedUsers = new Set();
+
+        for (const payment of existingPayments) {
+            const username = payment.userInfo?.username;
+            const userUid = payment.userInfo?.userUid;
+
+            if (username && username !== 'unknown' && !processedUsers.has(username)) {
+                // Create or update user profile based on payment history
+                const userPayments = existingPayments.filter(p => p.userInfo?.username === username);
+                const completedPayments = userPayments.filter(p => p.status === 'completed');
+                const totalAmount = completedPayments.reduce((sum, p) => sum + (p.paymentDetails?.amount || 0), 0);
+
+                const firstPayment = userPayments.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))[0];
+                const lastPayment = userPayments.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+
+                // Check if profile already exists
+                const existingProfile = await db.collection('user_profiles').findOne({ username });
+                
+                if (!existingProfile) {
+                    // Create new profile from payment history
+                    await db.collection('user_profiles').insertOne({
+                        username,
+                        userUid,
+                        profile: {
+                            firstSeen: firstPayment.timestamp,
+                            lastSeen: lastPayment.timestamp,
+                            totalLogins: 1, // We don't have auth history, so default to 1
+                            totalPayments: completedPayments.length,
+                            totalAmountPaid: totalAmount,
+                            lastPayment: lastPayment.timestamp,
+                            ipAddresses: [...new Set(userPayments.map(p => p.technicalInfo?.clientIP).filter(Boolean))],
+                            userAgents: [...new Set(userPayments.map(p => p.technicalInfo?.userAgent).filter(Boolean))]
+                        },
+                        created: new Date(),
+                        updated: new Date(),
+                        migratedFrom: 'existing_payments'
+                    });
+
+                    // Create activity records for all their payments
+                    for (const payment of userPayments) {
+                        // Payment approval activity
+                        await db.collection('user_activities').insertOne({
+                            username,
+                            userUid,
+                            activityType: 'payment_approval',
+                            timestamp: payment.timestamp,
+                            details: {
+                                paymentId: payment.paymentId,
+                                amount: payment.paymentDetails?.amount,
+                                memo: payment.paymentDetails?.memo,
+                                ip: payment.technicalInfo?.clientIP || 'unknown',
+                                userAgent: payment.technicalInfo?.userAgent || 'unknown',
+                                origin: payment.technicalInfo?.origin,
+                                migratedFrom: 'existing_payments'
+                            }
+                        });
+
+                        // Payment completion activity (if completed)
+                        if (payment.status === 'completed' && payment.completedAt) {
+                            await db.collection('user_activities').insertOne({
+                                username,
+                                userUid,
+                                activityType: 'payment_completion',
+                                timestamp: payment.completedAt,
+                                details: {
+                                    paymentId: payment.paymentId,
+                                    txId: payment.txId,
+                                    amount: payment.completionDetails?.finalAmount || payment.paymentDetails?.amount,
+                                    transactionVerified: payment.completionDetails?.transactionVerified,
+                                    ip: payment.completionDetails?.completionIP || 'unknown',
+                                    userAgent: payment.completionDetails?.completionUserAgent || 'unknown',
+                                    transactionLink: payment.completionDetails?.transactionLink,
+                                    migratedFrom: 'existing_payments'
+                                }
+                            });
+                        }
+                    }
+
+                    migratedUsers++;
+                    console.log(`✅ Migrated user: ${username} (${userPayments.length} payments, ${totalAmount} Pi total)`);
+                } else {
+                    console.log(`⏭️  User profile already exists: ${username}`);
+                }
+
+                processedUsers.add(username);
+            }
+        }
+
+        console.log(`🎉 Migration complete! Migrated ${migratedUsers} users to new structure`);
+        console.log(`📋 Old collections (payments, sessions, user_sessions) preserved for backward compatibility`);
+        
+    } catch (error) {
+        console.error('❌ Migration failed:', error.message);
+    }
+}
+
+// Run migration on startup (only if needed)
+setTimeout(() => {
+    if (db) {
+        migrateExistingData();
+    }
+}, 3000); // Wait 3 seconds after DB connection
+
+// User Profile Management Functions
+async function createOrUpdateUserProfile(username, userUid, activityData = {}) {
+    if (!db || !username) return;
+    
+    try {
+        const now = new Date();
+        const clientIP = activityData.ip || 'unknown';
+        const userAgent = activityData.userAgent || 'unknown';
+        
+        // Check if profile exists
+        const existingProfile = await db.collection('user_profiles').findOne({ username });
+        
+        if (existingProfile) {
+            // Update existing profile
+            await db.collection('user_profiles').updateOne(
+                { username },
+                {
+                    $set: {
+                        lastSeen: now,
+                        updated: now
+                    },
+                    $inc: {
+                        totalLogins: 1
+                    },
+                    $addToSet: {
+                        'profile.ipAddresses': clientIP,
+                        'profile.userAgents': userAgent
+                    }
+                }
+            );
+            console.log(`📝 Updated profile for user: ${username}`);
+        } else {
+            // Create new profile
+            await db.collection('user_profiles').insertOne({
+                username,
+                userUid,
+                profile: {
+                    firstSeen: now,
+                    lastSeen: now,
+                    totalLogins: 1,
+                    totalPayments: 0,
+                    totalAmountPaid: 0,
+                    ipAddresses: [clientIP],
+                    userAgents: [userAgent]
+                },
+                created: now,
+                updated: now
+            });
+            console.log(`🆕 Created new profile for user: ${username}`);
+        }
+    } catch (error) {
+        console.error('⚠️  Profile management failed:', error.message);
+    }
+}
+
+async function logUserActivity(username, userUid, activityType, details = {}) {
+    if (!db || !username) return;
+    
+    try {
+        const activity = {
+            username,
+            userUid,
+            activityType,
+            timestamp: new Date(),
+            details: {
+                ...details,
+                ip: details.ip || 'unknown',
+                userAgent: details.userAgent || 'unknown'
+            }
+        };
+        
+        await db.collection('user_activities').insertOne(activity);
+        console.log(`📋 Logged activity: ${activityType} for user: ${username}`);
+    } catch (error) {
+        console.error('⚠️  Activity logging failed:', error.message);
+    }
+}
+
 // Serve the HTML page
 app.get('/', (req, res) => {
     // Log user session data
@@ -202,6 +398,27 @@ app.post('/approve-payment', async (req, res) => {
                                    (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
                                    req.ip;
 
+                    const username = paymentData.metadata?.username || 'unknown';
+                    const userUid = paymentData.user_uid;
+
+                    // Update user profile for payment activity
+                    if (username !== 'unknown') {
+                        await createOrUpdateUserProfile(username, userUid, {
+                            ip: clientIP,
+                            userAgent: req.get('user-agent')
+                        });
+
+                        // Log payment approval activity
+                        await logUserActivity(username, userUid, 'payment_approval', {
+                            paymentId: paymentId,
+                            amount: paymentData.amount,
+                            memo: paymentData.memo,
+                            ip: clientIP,
+                            userAgent: req.get('user-agent'),
+                            origin: req.get('origin')
+                        });
+                    }
+
                     const paymentRecord = {
                         paymentId,
                         status: 'approved',
@@ -209,8 +426,8 @@ app.post('/approve-payment', async (req, res) => {
                         
                         // User Information
                         userInfo: {
-                            username: paymentData.metadata?.username || 'unknown',
-                            userUid: paymentData.user_uid,
+                            username: username,
+                            userUid: userUid,
                             piAddress: paymentData.from_address || 'pending'
                         },
                         
@@ -241,6 +458,7 @@ app.post('/approve-payment', async (req, res) => {
                     await db.collection('payments').insertOne(paymentRecord);
                     console.log('💾 Enhanced payment approval saved to database');
                     console.log(`👤 User: ${paymentRecord.userInfo.username} from IP: ${clientIP}`);
+                    console.log(`📋 Profile and activity updated for payment approval: ${username}`);
                 } catch (dbError) {
                     console.error('⚠️  Database save failed:', dbError.message);
                 }
@@ -307,6 +525,41 @@ app.post('/complete-payment', async (req, res) => {
                                    (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
                                    req.ip;
 
+                    // Get user info from the existing payment record
+                    const existingPayment = await db.collection('payments').findOne({ paymentId });
+                    const username = existingPayment?.userInfo?.username || 'unknown';
+                    const userUid = existingPayment?.userInfo?.userUid;
+                    const amount = data.amount || existingPayment?.paymentDetails?.amount || 0;
+
+                    // Update user profile with completed payment stats
+                    if (username !== 'unknown') {
+                        // Update user profile payment totals
+                        await db.collection('user_profiles').updateOne(
+                            { username },
+                            {
+                                $inc: {
+                                    'profile.totalPayments': 1,
+                                    'profile.totalAmountPaid': amount
+                                },
+                                $set: {
+                                    'profile.lastPayment': new Date(),
+                                    updated: new Date()
+                                }
+                            }
+                        );
+
+                        // Log payment completion activity
+                        await logUserActivity(username, userUid, 'payment_completion', {
+                            paymentId: paymentId,
+                            txId: txId,
+                            amount: amount,
+                            transactionVerified: data.status?.transaction_verified,
+                            ip: clientIP,
+                            userAgent: req.get('user-agent'),
+                            transactionLink: data.transaction?._link
+                        });
+                    }
+
                     await db.collection('payments').updateOne(
                         { paymentId },
                         { 
@@ -333,6 +586,7 @@ app.post('/complete-payment', async (req, res) => {
                     );
                     console.log('💾 Enhanced payment completion saved to database');
                     console.log(`🔗 Transaction: ${txId} verified: ${data.status?.transaction_verified}`);
+                    console.log(`📋 Profile updated with completed payment for user: ${username}`);
                 } catch (dbError) {
                     console.error('⚠️  Database update failed:', dbError.message);
                 }
@@ -363,6 +617,22 @@ app.post('/log-auth', async (req, res) => {
                             (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
                             req.ip;
 
+            // Create or update user profile
+            await createOrUpdateUserProfile(username, userUid, {
+                ip: clientIP,
+                userAgent: req.get('user-agent')
+            });
+
+            // Log authentication activity
+            await logUserActivity(username, userUid, 'authentication', {
+                authSuccess: authSuccess,
+                ip: clientIP,
+                userAgent: req.get('user-agent'),
+                origin: req.get('origin'),
+                referer: req.get('referer')
+            });
+
+            // Also keep old format for backward compatibility
             const authRecord = {
                 type: 'user_authentication',
                 timestamp: new Date(),
@@ -385,6 +655,7 @@ app.post('/log-auth', async (req, res) => {
 
             await db.collection('user_sessions').insertOne(authRecord);
             console.log(`🔐 User authentication logged: ${username} from IP: ${clientIP}`);
+            console.log(`📋 Profile and activity updated for user: ${username}`);
             
             res.json({ success: true, message: 'Authentication logged' });
         } catch (error) {
@@ -514,6 +785,138 @@ app.get('/analytics', async (req, res) => {
         res.status(500).json({ 
             success: false, 
             error: 'Failed to fetch analytics' 
+        });
+    }
+});
+
+// Get user profiles from database
+app.get('/user-profiles', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const profiles = await db.collection('user_profiles').find().sort({ 'profile.lastSeen': -1 }).toArray();
+        res.json({ 
+            success: true, 
+            count: profiles.length,
+            profiles 
+        });
+    } catch (error) {
+        console.error('❌ Failed to fetch user profiles:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch user profiles' 
+        });
+    }
+});
+
+// Get user activities from database
+app.get('/user-activities', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const { username, limit = 100 } = req.query;
+        let query = {};
+        
+        if (username) {
+            query.username = username;
+        }
+
+        const activities = await db.collection('user_activities')
+            .find(query)
+            .sort({ timestamp: -1 })
+            .limit(parseInt(limit))
+            .toArray();
+            
+        res.json({ 
+            success: true, 
+            count: activities.length,
+            username: username || 'all users',
+            activities 
+        });
+    } catch (error) {
+        console.error('❌ Failed to fetch user activities:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch user activities' 
+        });
+    }
+});
+
+// Get specific user profile and activities
+app.get('/user/:username', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const { username } = req.params;
+        const { activityLimit = 50 } = req.query;
+
+        const profile = await db.collection('user_profiles').findOne({ username });
+        const activities = await db.collection('user_activities')
+            .find({ username })
+            .sort({ timestamp: -1 })
+            .limit(parseInt(activityLimit))
+            .toArray();
+
+        if (!profile) {
+            return res.status(404).json({
+                success: false,
+                error: 'User profile not found'
+            });
+        }
+
+        res.json({ 
+            success: true, 
+            user: {
+                profile,
+                recentActivities: activities,
+                activityCount: activities.length
+            }
+        });
+    } catch (error) {
+        console.error('❌ Failed to fetch user details:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch user details' 
+        });
+    }
+});
+
+// Manual migration endpoint
+app.post('/migrate-data', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        console.log('🔄 Manual migration triggered...');
+        await migrateExistingData();
+        res.json({ 
+            success: true, 
+            message: 'Data migration completed successfully' 
+        });
+    } catch (error) {
+        console.error('❌ Manual migration failed:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Migration failed: ' + error.message 
         });
     }
 });
