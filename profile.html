@@ -70,10 +70,33 @@
     <button onclick="logout()" id="logoutBtn" style="padding:12px 25px; font-size:2rem; background-color:#030006; color: white; border:none; border-radius:8px; cursor:pointer;">Log Out</button>
   </div>
 
-  
+  <!-- Debug Information Section -->
+  <div id="debugInfo" style="margin-top: 30px; padding: 15px; background: #f0f0f0; border-radius: 8px; font-family: monospace; font-size: 12px;">
+    <strong>🔍 Profile Debug Information:</strong><br>
+    <div id="debugContent"></div>
+  </div>
 
   <script>
     let piUser = null; // Will hold the authenticated Pi user
+    
+    // Debug function
+    function addDebugInfo(message) {
+      const debugContent = document.getElementById('debugContent');
+      const timestamp = new Date().toLocaleTimeString();
+      debugContent.innerHTML += `[${timestamp}] ${message}<br>`;
+      console.log(`[PROFILE DEBUG] ${message}`);
+    }
+    
+    // Initialize debug info
+    addDebugInfo('🔄 Profile page loaded');
+    addDebugInfo(`Backend URL: ${CONFIG.BACKEND_URL}`);
+    addDebugInfo(`User Agent: ${navigator.userAgent}`);
+    
+    if (navigator.userAgent.includes('Pi Browser') || navigator.userAgent.includes('iPhone')) {
+      addDebugInfo('✅ Pi Browser detected');
+    } else {
+      addDebugInfo('⚠️ Not Pi Browser - authentication may not work');
+    }
     
 
     function logout() {
@@ -93,9 +116,12 @@
     function subscribe() {
       // Use authenticated Pi user for subscription
       if (!piUser) {
+        addDebugInfo('❌ Subscribe clicked but no piUser available');
         alert('Please authenticate with Pi Network first');
         return;
       }
+      
+      addDebugInfo(`🔄 Redirecting to subscription payment for: ${piUser.username}`);
       
       // Redirect to auctionPayment.html with Pi user parameters
       let redirectUrl = "auctionPayment.html";
@@ -103,12 +129,15 @@
       if (piUser.wallet) {
         redirectUrl += `&wallet=${encodeURIComponent(piUser.wallet)}`;
       }
+      
+      addDebugInfo(`🔗 Redirect URL: ${redirectUrl}`);
       window.location.href = redirectUrl;
     }
 
     // Authenticate with Pi Network and load user profile
     async function authenticateAndLoadProfile() {
       try {
+        addDebugInfo('🔐 Starting Pi Network authentication...');
         console.log('🔐 Starting Pi Network authentication...');
         
         // Check if Pi SDK is available
@@ -116,18 +145,24 @@
           throw new Error('Pi SDK not loaded. Please open this app in Pi Browser.');
         }
         
+        addDebugInfo('✅ Pi SDK detected');
+        
         // Initialize Pi SDK
         Pi.init({
           version: "2.0",
           sandbox: true
         });
         
+        addDebugInfo('✅ Pi SDK initialized');
         console.log('🔐 Pi SDK initialized, authenticating user...');
         
         // Authenticate user with Pi Network
         const auth = await Pi.authenticate(['username', 'payments']);
         piUser = auth.user;
         
+        addDebugInfo(`✅ Pi Network authentication successful! User: ${piUser.username}`);
+        addDebugInfo(`🔍 User UID: ${piUser.uid}`);
+        addDebugInfo(`🔍 User wallet: ${piUser.wallet || 'Not provided'}`);
         console.log(`✅ Pi Network authentication successful! User: ${piUser.username}`);
         console.log('Full Pi user object:', piUser);
         
@@ -135,13 +170,18 @@
         document.getElementById("userInfo").innerHTML = `<strong>Username:</strong> ${piUser.username}`;
         displayWalletInfo(piUser.wallet);
         
+        addDebugInfo('🔄 Creating/updating user profile in backend...');
+        
         // Create/update user profile in backend
         await createUserProfileIfNeeded(piUser.username, piUser.wallet, piUser.uid);
+        
+        addDebugInfo('🔄 Checking subscription status and updating UI...');
         
         // Check subscription status for authenticated user and update UI accordingly
         await checkSubscriptionStatusAndUpdateUI(piUser.username);
         
       } catch (error) {
+        addDebugInfo(`❌ Pi Network authentication failed: ${error.message}`);
         console.error('❌ Pi Network authentication failed:', error);
         showAuthenticationError();
       }
@@ -149,6 +189,7 @@
 
     // Show authentication error state
     function showAuthenticationError() {
+      addDebugInfo('🔄 Showing authentication error state...');
       console.log('🔄 Showing authentication error state...');
       
       // Show error message to user
@@ -170,18 +211,31 @@
           </button>
         </div>
       `;
+      
+      addDebugInfo('✅ Authentication error UI displayed');
     }
 
     // Show subscription state based on user's subscription status
     function showSubscriptionState(hasActiveSubscription, subscriptionData = null) {
+      addDebugInfo(`🎯 Updating UI state - hasActiveSubscription: ${hasActiveSubscription}`);
       console.log(`🎯 Updating UI state - hasActiveSubscription: ${hasActiveSubscription}`);
       
       const subscriptionTextElement = document.getElementById('subscriptionText');
       const subscribeSectionElement = document.getElementById('subscribeSection');
       
+      // Log current element states before changes
+      addDebugInfo(`📊 BEFORE CHANGES:`);
+      addDebugInfo(`   - subscriptionText display: ${subscriptionTextElement.style.display}`);
+      addDebugInfo(`   - subscribeSection display: ${subscribeSectionElement.style.display}`);
+      
       if (hasActiveSubscription) {
         // User HAS active subscription - show "Enjoy Appraisells auctions" text
+        addDebugInfo('✅ Showing SUBSCRIBED state - "Enjoy Appraisells auctions"');
         console.log('✅ Showing SUBSCRIBED state - "Enjoy Appraisells auctions"');
+        
+        if (subscriptionData) {
+          addDebugInfo(`📋 Subscription details: End date: ${subscriptionData.endDate}, Days remaining: ${subscriptionData.daysRemaining}`);
+        }
         
         // Reset the subscribe section to original button (in case it was changed to login)
         subscribeSectionElement.innerHTML = `
@@ -197,10 +251,12 @@
         subscribeSectionElement.style.visibility = 'hidden';
         subscribeSectionElement.className = 'subscription-hidden';
         
+        addDebugInfo('🎉 SUBSCRIBED USER: Should see "Enjoy Appraisells auctions"');
         console.log('🎉 SUBSCRIBED USER: Should see "Enjoy Appraisells auctions"');
         
       } else {
         // User has NO active subscription - show Subscribe button
+        addDebugInfo('❌ Showing UNSUBSCRIBED state - Subscribe button');
         console.log('❌ Showing UNSUBSCRIBED state - Subscribe button');
         
         // Reset the subscribe section to original button (in case it was changed to login)
@@ -217,10 +273,16 @@
         subscribeSectionElement.style.visibility = 'visible';
         subscribeSectionElement.className = 'subscription-active';
         
+        addDebugInfo('💳 UNSUBSCRIBED USER: Should see Subscribe button');
         console.log('💳 UNSUBSCRIBED USER: Should see Subscribe button');
       }
       
       // Final verification
+      addDebugInfo(`📊 AFTER CHANGES:`);
+      addDebugInfo(`   - subscriptionText display: ${subscriptionTextElement.style.display}`);
+      addDebugInfo(`   - subscribeSection display: ${subscribeSectionElement.style.display}`);
+      addDebugInfo(`   - subscriptionText className: ${subscriptionTextElement.className}`);
+      addDebugInfo(`   - subscribeSection className: ${subscribeSectionElement.className}`);
       console.log(`🔍 Final UI state verification:`);
       console.log(`   - subscriptionText display: ${subscriptionTextElement.style.display}`);
       console.log(`   - subscribeSection display: ${subscribeSectionElement.style.display}`);
@@ -229,6 +291,7 @@
     // Create user profile in backend if it doesn't exist
     async function createUserProfileIfNeeded(username, wallet, userUid) {
       try {
+        addDebugInfo(`🔄 Ensuring user profile exists for: ${username}`);
         console.log(`🔄 Ensuring user profile exists for: ${username}`);
         
         const response = await fetch(`${CONFIG.BACKEND_URL}/create-user-profile`, {
@@ -244,15 +307,20 @@
           })
         });
         
+        addDebugInfo(`📬 Profile creation response: ${response.status} ${response.statusText}`);
+        
         const result = await response.json();
         
         if (result.success) {
+          addDebugInfo(`✅ User profile ready for: ${username}`);
           console.log(`✅ User profile ready for: ${username}`);
         } else {
+          addDebugInfo(`⚠️ Profile creation failed for ${username}: ${result.error}`);
           console.warn(`⚠️ Profile creation failed for ${username}:`, result.error);
         }
         
       } catch (error) {
+        addDebugInfo(`❌ Failed to create user profile: ${error.message}`);
         console.error('❌ Failed to create user profile:', error);
         // Don't block subscription checking if this fails
       }
@@ -261,11 +329,13 @@
     // Check subscription status and update UI accordingly
     async function checkSubscriptionStatusAndUpdateUI(username) {
       try {
+        addDebugInfo(`🔍 Starting subscription check for: ${username}`);
         console.log(`🔍 Starting subscription check for: ${username}`);
         
         // Add cache busting to ensure fresh data
         const timestamp = Date.now();
         const url = `${CONFIG.BACKEND_URL}/subscription-status/${username}?t=${timestamp}`;
+        addDebugInfo(`📡 Fetching from: ${url}`);
         console.log(`📡 Fetching from: ${url}`);
         
         const response = await fetch(url, {
@@ -277,6 +347,7 @@
           }
         });
         
+        addDebugInfo(`📬 Response status: ${response.status}`);
         console.log(`📬 Response status: ${response.status}`);
         
         if (!response.ok) {
@@ -284,22 +355,29 @@
         }
         
         const result = await response.json();
+        addDebugInfo(`📊 Raw subscription result: ${JSON.stringify(result)}`);
+        addDebugInfo(`🔍 result.success: ${result.success}`);
+        addDebugInfo(`🔍 result.subscribed: ${result.subscribed}`);
         console.log(`📊 Full subscription result:`, result);
         console.log(`🔍 result.success: ${result.success}`);
         console.log(`🔍 result.subscribed: ${result.subscribed}`);
         
         // Use the new UI management function
         if (result.success && result.subscribed) {
+          addDebugInfo(`✅ ${username} HAS ACTIVE SUBSCRIPTION!`);
           console.log(`✅ ${username} HAS ACTIVE SUBSCRIPTION!`);
           showSubscriptionState(true, result);
         } else {
+          addDebugInfo(`❌ ${username} has no active subscription`);
           console.log(`❌ ${username} has no active subscription`);
           showSubscriptionState(false, result);
         }
         
       } catch (error) {
+        addDebugInfo(`❌ Failed to check subscription status: ${error.message}`);
         console.error('❌ Failed to check subscription status:', error);
         // On error, show unsubscribed state (safe default)
+        addDebugInfo(`⚠️ Error occurred - showing unsubscribed state as default`);
         console.log(`⚠️ Error occurred - showing unsubscribed state as default`);
         showSubscriptionState(false);
       }
@@ -307,11 +385,13 @@
 
     // Initialize page with Pi Network authentication
     window.addEventListener('load', function() {
+      addDebugInfo('🔄 Profile page loaded - starting Pi Network authentication...');
       console.log('🔄 Profile page loaded - starting Pi Network authentication...');
       
       // Hide both elements initially
       document.getElementById('subscriptionText').style.display = 'none';
       document.getElementById('subscribeSection').style.display = 'none';
+      addDebugInfo('🔄 Initial UI elements hidden');
       
       // Start Pi Network authentication
       authenticateAndLoadProfile();
