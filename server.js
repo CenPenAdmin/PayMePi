@@ -102,6 +102,52 @@ connectToMongoDB();
 
 // Serve the HTML page
 app.get('/', (req, res) => {
+    // Log user session data
+    if (db) {
+        const clientIP = req.headers['x-forwarded-for'] || 
+                        req.headers['x-real-ip'] || 
+                        req.connection.remoteAddress || 
+                        req.socket.remoteAddress ||
+                        (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+                        req.ip;
+
+        const sessionData = {
+            sessionId: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9),
+            type: 'page_visit',
+            timestamp: new Date(),
+            
+            // User Information
+            clientInfo: {
+                ip: clientIP,
+                userAgent: req.get('user-agent'),
+                origin: req.get('origin'),
+                referer: req.get('referer'),
+                acceptLanguage: req.get('accept-language'),
+                acceptEncoding: req.get('accept-encoding'),
+                host: req.get('host'),
+                connection: req.get('connection')
+            },
+            
+            // Request Details
+            requestInfo: {
+                method: req.method,
+                url: req.url,
+                protocol: req.protocol,
+                secure: req.secure,
+                path: req.path,
+                query: req.query,
+                cookies: req.headers.cookie
+            }
+        };
+
+        // Save session data asynchronously (don't block response)
+        db.collection('sessions').insertOne(sessionData).catch(err => {
+            console.error('⚠️  Session save failed:', err.message);
+        });
+
+        console.log(`🌐 Page visit from IP: ${clientIP} at ${new Date().toISOString()}`);
+    }
+    
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
@@ -142,16 +188,59 @@ app.post('/approve-payment', async (req, res) => {
         if (response.ok) {
             console.log('✅ Payment approved successfully');
             
-            // Save payment approval to MongoDB
+            // Parse the response to extract user data
+            const paymentData = JSON.parse(responseText);
+            
+            // Save comprehensive payment approval to MongoDB
             if (db) {
                 try {
-                    await db.collection('payments').insertOne({
+                    // Get client IP address
+                    const clientIP = req.headers['x-forwarded-for'] || 
+                                   req.headers['x-real-ip'] || 
+                                   req.connection.remoteAddress || 
+                                   req.socket.remoteAddress ||
+                                   (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+                                   req.ip;
+
+                    const paymentRecord = {
                         paymentId,
                         status: 'approved',
                         timestamp: new Date(),
-                        apiResponse: responseText
-                    });
-                    console.log('💾 Payment approval saved to database');
+                        
+                        // User Information
+                        userInfo: {
+                            username: paymentData.metadata?.username || 'unknown',
+                            userUid: paymentData.user_uid,
+                            piAddress: paymentData.from_address || 'pending'
+                        },
+                        
+                        // Payment Details
+                        paymentDetails: {
+                            amount: paymentData.amount,
+                            memo: paymentData.memo,
+                            network: paymentData.network,
+                            direction: paymentData.direction,
+                            orderId: paymentData.metadata?.orderId
+                        },
+                        
+                        // Technical Information
+                        technicalInfo: {
+                            clientIP: clientIP,
+                            userAgent: req.get('user-agent'),
+                            origin: req.get('origin'),
+                            referer: req.get('referer'),
+                            acceptLanguage: req.get('accept-language'),
+                            acceptEncoding: req.get('accept-encoding')
+                        },
+                        
+                        // Pi API Response
+                        apiResponse: responseText,
+                        piApiStatus: paymentData.status
+                    };
+
+                    await db.collection('payments').insertOne(paymentRecord);
+                    console.log('💾 Enhanced payment approval saved to database');
+                    console.log(`👤 User: ${paymentRecord.userInfo.username} from IP: ${clientIP}`);
                 } catch (dbError) {
                     console.error('⚠️  Database save failed:', dbError.message);
                 }
@@ -207,9 +296,17 @@ app.post('/complete-payment', async (req, res) => {
             const data = JSON.parse(responseText);
             console.log('✅ Payment completed successfully:', data);
             
-            // Update payment completion in MongoDB
+            // Update payment completion in MongoDB with comprehensive data
             if (db) {
                 try {
+                    // Get client IP address
+                    const clientIP = req.headers['x-forwarded-for'] || 
+                                   req.headers['x-real-ip'] || 
+                                   req.connection.remoteAddress || 
+                                   req.socket.remoteAddress ||
+                                   (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+                                   req.ip;
+
                     await db.collection('payments').updateOne(
                         { paymentId },
                         { 
@@ -217,11 +314,25 @@ app.post('/complete-payment', async (req, res) => {
                                 status: 'completed', 
                                 txId, 
                                 completedAt: new Date(),
+                                
+                                // Enhanced completion data
+                                completionDetails: {
+                                    transactionVerified: data.status?.transaction_verified,
+                                    developerCompleted: data.status?.developer_completed,
+                                    fromAddress: data.from_address,
+                                    toAddress: data.to_address,
+                                    transactionLink: data.transaction?._link,
+                                    finalAmount: data.amount,
+                                    completionIP: clientIP,
+                                    completionUserAgent: req.get('user-agent')
+                                },
+                                
                                 completionData: data
                             } 
                         }
                     );
-                    console.log('💾 Payment completion saved to database');
+                    console.log('💾 Enhanced payment completion saved to database');
+                    console.log(`🔗 Transaction: ${txId} verified: ${data.status?.transaction_verified}`);
                 } catch (dbError) {
                     console.error('⚠️  Database update failed:', dbError.message);
                 }
@@ -236,6 +347,52 @@ app.post('/complete-payment', async (req, res) => {
     } catch (error) {
         console.error('❌ Error completing payment:', error.message);
         res.status(500).json({ success: false, error: `Internal server error: ${error.message}` });
+    }
+});
+
+// User authentication tracking endpoint
+app.post('/log-auth', async (req, res) => {
+    const { username, userUid, authSuccess } = req.body;
+    
+    if (db) {
+        try {
+            const clientIP = req.headers['x-forwarded-for'] || 
+                            req.headers['x-real-ip'] || 
+                            req.connection.remoteAddress || 
+                            req.socket.remoteAddress ||
+                            (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+                            req.ip;
+
+            const authRecord = {
+                type: 'user_authentication',
+                timestamp: new Date(),
+                
+                // User Information
+                userInfo: {
+                    username: username || 'unknown',
+                    userUid: userUid || 'unknown',
+                    authSuccess: authSuccess
+                },
+                
+                // Technical Information
+                technicalInfo: {
+                    clientIP: clientIP,
+                    userAgent: req.get('user-agent'),
+                    origin: req.get('origin'),
+                    referer: req.get('referer')
+                }
+            };
+
+            await db.collection('user_sessions').insertOne(authRecord);
+            console.log(`🔐 User authentication logged: ${username} from IP: ${clientIP}`);
+            
+            res.json({ success: true, message: 'Authentication logged' });
+        } catch (error) {
+            console.error('⚠️  Auth logging failed:', error.message);
+            res.status(500).json({ success: false, error: 'Failed to log authentication' });
+        }
+    } else {
+        res.status(503).json({ success: false, error: 'Database not connected' });
     }
 });
 
@@ -260,6 +417,103 @@ app.get('/payments', async (req, res) => {
         res.status(500).json({ 
             success: false, 
             error: 'Failed to fetch payments' 
+        });
+    }
+});
+
+// Get session data from database
+app.get('/sessions', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const sessions = await db.collection('sessions').find().sort({ timestamp: -1 }).limit(50).toArray();
+        const userSessions = await db.collection('user_sessions').find().sort({ timestamp: -1 }).limit(50).toArray();
+        
+        res.json({ 
+            success: true, 
+            pageVisits: {
+                count: sessions.length,
+                data: sessions
+            },
+            userAuthentications: {
+                count: userSessions.length,
+                data: userSessions
+            }
+        });
+    } catch (error) {
+        console.error('❌ Failed to fetch sessions:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch sessions' 
+        });
+    }
+});
+
+// Get comprehensive analytics
+app.get('/analytics', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const [payments, sessions, userSessions] = await Promise.all([
+            db.collection('payments').find().toArray(),
+            db.collection('sessions').find().toArray(),
+            db.collection('user_sessions').find().toArray()
+        ]);
+
+        // Calculate analytics
+        const analytics = {
+            overview: {
+                totalPayments: payments.length,
+                completedPayments: payments.filter(p => p.status === 'completed').length,
+                totalPageVisits: sessions.length,
+                totalAuthentications: userSessions.length,
+                uniqueUsers: [...new Set(payments.map(p => p.userInfo?.username).filter(Boolean))].length
+            },
+            
+            recentActivity: {
+                lastPayment: payments.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0],
+                lastVisit: sessions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0],
+                lastAuth: userSessions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0]
+            },
+            
+            users: payments.reduce((acc, payment) => {
+                const username = payment.userInfo?.username || 'unknown';
+                if (!acc[username]) {
+                    acc[username] = {
+                        totalPayments: 0,
+                        totalAmount: 0,
+                        firstSeen: payment.timestamp,
+                        lastSeen: payment.timestamp
+                    };
+                }
+                acc[username].totalPayments++;
+                acc[username].totalAmount += payment.paymentDetails?.amount || 0;
+                if (new Date(payment.timestamp) > new Date(acc[username].lastSeen)) {
+                    acc[username].lastSeen = payment.timestamp;
+                }
+                return acc;
+            }, {})
+        };
+
+        res.json({ 
+            success: true, 
+            analytics
+        });
+    } catch (error) {
+        console.error('❌ Failed to fetch analytics:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch analytics' 
         });
     }
 });

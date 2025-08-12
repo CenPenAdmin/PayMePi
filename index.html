@@ -181,6 +181,24 @@
                 console.log('Full auth object:', auth);
                 console.log('User object:', piUser);
                 
+                // Log authentication to backend
+                try {
+                    await fetch(`${CONFIG.BACKEND_URL}/log-auth`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            username: piUser.username,
+                            userUid: piUser.uid,
+                            authSuccess: true
+                        })
+                    });
+                    addDebugInfo('Authentication logged to database');
+                } catch (logError) {
+                    addDebugInfo(`Failed to log authentication: ${logError.message}`);
+                }
+                
                 // Update UI with user information
                 document.getElementById('userInfo').innerHTML = `
                     <strong>Welcome, ${piUser.username}!</strong><br>
