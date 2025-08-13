@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auction Winners - Appraisells</title>
+    
+    <!-- Configuration -->
+    <script src="config.js"></script>
+    
+    <!-- Pi SDK -->
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: white;
+            color: #030006;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+        }
+        
+        header {
+            background-color: #030006;
+            padding: 20px 0;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 3.5em;
+            color: white;
+            text-align: center;
+        }
+        
+        .winner-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .winner-title {
+            text-align: center;
+            font-size: 2.5em;
+            margin: 30px 0;
+            color: #030006;
+        }
+        
+        .congratulations {
+            text-align: center;
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            border: 3px solid #ffd700;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
+        }
+        
+        .congratulations h2 {
+            font-size: 2em;
+            margin: 0 0 15px 0;
+            color: #030006;
+        }
+        
+        .congratulations p {
+            font-size: 1.2em;
+            margin: 10px 0;
+            color: #333;
+        }
+        
+        .wins-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+        
+        .win-item {
+            border: 3px solid #28a745;
+            border-radius: 15px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f8fff8, #e8ffe8);
+            text-align: center;
+            position: relative;
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.2);
+        }
+        
+        .win-badge {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #28a745;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .artwork-info {
+            margin: 20px 0;
+        }
+        
+        .artist-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #030006;
+            margin-bottom: 8px;
+        }
+        
+        .artwork-title {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+        
+        .winning-bid {
+            font-size: 2em;
+            font-weight: bold;
+            color: #28a745;
+            margin: 15px 0;
+        }
+        
+        .payment-section {
+            margin-top: 25px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .payment-status {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        .payment-pending {
+            color: #ff8800;
+        }
+        
+        .payment-paid {
+            color: #28a745;
+        }
+        
+        .payment-expired {
+            color: #dc3545;
+        }
+        
+        .deadline-timer {
+            font-size: 1.1em;
+            color: #ff4444;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        
+        .pay-button {
+            background: #030006;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px 0;
+            width: 100%;
+            transition: background 0.3s ease;
+        }
+        
+        .pay-button:hover {
+            background: #1a1a1a;
+        }
+        
+        .pay-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .payment-info {
+            font-size: 0.95em;
+            color: #666;
+            margin-top: 15px;
+            line-height: 1.4;
+        }
+        
+        .loading {
+            text-align: center;
+            font-size: 1.2em;
+            color: #666;
+            margin: 50px 0;
+        }
+        
+        .no-wins {
+            text-align: center;
+            padding: 60px 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border: 2px dashed #ccc;
+        }
+        
+        .no-wins h3 {
+            font-size: 1.5em;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .no-wins p {
+            font-size: 1.1em;
+            color: #888;
+            margin-bottom: 20px;
+        }
+        
+        .back-button {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1em;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .back-button:hover {
+            background: #5a6268;
+        }
+        
+        .user-info {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>APPRAISELLS</h1>
+    </header>
+    
+    <div class="winner-container">
+        <div class="winner-title">🏆 Auction Winners</div>
+        
+        <div class="user-info">
+            <div id="userStatus">Loading user status...</div>
+        </div>
+        
+        <div class="loading" id="loadingMessage">Loading your auction wins...</div>
+        
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        
+        <div id="congratulationsSection" style="display: none;">
+            <div class="congratulations">
+                <h2>🎉 Congratulations!</h2>
+                <p id="congratsMessage">You won auction items!</p>
+                <p><strong>Please complete payment within 48 hours to secure your artwork.</strong></p>
+            </div>
+        </div>
+        
+        <div class="wins-grid" id="winsGrid" style="display: none;">
+            <!-- Winner items will be loaded here -->
+        </div>
+        
+        <div id="noWinsSection" class="no-wins" style="display: none;">
+            <h3>No Auction Wins</h3>
+            <p>You haven't won any auction items yet.</p>
+            <p>Keep bidding in future auctions for a chance to win amazing artwork!</p>
+            <a href="liveAuction.html" class="back-button">Back to Live Auction</a>
+        </div>
+    </div>
+    
+    <script>
+        let piUser = null;
+        let userWins = [];
+        let paymentTimers = {};
+        
+        // Initialize page
+        window.addEventListener('load', function() {
+            console.log('🏆 Winner page loaded');
+            authenticateAndLoadWins();
+        });
+        
+        // Authenticate with Pi Network and load wins
+        async function authenticateAndLoadWins() {
+            try {
+                console.log('🔐 Starting Pi Network authentication...');
+                
+                // Check if Pi SDK is available
+                if (typeof Pi === 'undefined') {
+                    throw new Error('Pi SDK not loaded. Please open this app in Pi Browser.');
+                }
+                
+                // Initialize Pi SDK
+                Pi.init({
+                    version: "2.0",
+                    sandbox: true
+                });
+                
+                // Authenticate user
+                const auth = await Pi.authenticate(['username', 'payments']);
+                piUser = auth.user;
+                
+                console.log(`✅ Authenticated as: ${piUser.username}`);
+                
+                // Update user status
+                document.getElementById('userStatus').innerHTML = `
+                    <strong>Welcome, ${piUser.username}!</strong>
+                `;
+                
+                // Load user's wins
+                await loadUserWins();
+                
+            } catch (error) {
+                console.error('❌ Authentication failed:', error);
+                showError('Authentication required. Please open this app in Pi Browser and allow authentication.');
+            }
+        }
+        
+        // Load user's auction wins
+        async function loadUserWins() {
+            try {
+                const response = await fetch(`${CONFIG.BACKEND_URL}/user-wins/${piUser.username}`, {
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    userWins = result.wins;
+                    console.log(`🏆 Found ${userWins.length} wins for ${piUser.username}`);
+                    displayWins();
+                } else {
+                    throw new Error(result.error || 'Failed to load wins');
+                }
+                
+            } catch (error) {
+                console.error('❌ Failed to load user wins:', error);
+                showError('Failed to load your auction wins. Please try again.');
+            } finally {
+                document.getElementById('loadingMessage').style.display = 'none';
+            }
+        }
+        
+        // Display user's wins
+        function displayWins() {
+            if (userWins.length === 0) {
+                document.getElementById('noWinsSection').style.display = 'block';
+                return;
+            }
+            
+            // Show congratulations
+            document.getElementById('congratulationsSection').style.display = 'block';
+            document.getElementById('congratsMessage').textContent = 
+                `You won ${userWins.length} auction item${userWins.length > 1 ? 's' : ''}!`;
+            
+            // Create win items
+            const winsGrid = document.getElementById('winsGrid');
+            winsGrid.innerHTML = '';
+            
+            userWins.forEach((win, index) => {
+                const winElement = createWinElement(win, index + 1);
+                winsGrid.appendChild(winElement);
+                
+                // Start payment deadline timer if needed
+                if (win.paymentStatus === 'pending') {
+                    startPaymentTimer(win.itemId, win.paymentDeadline);
+                }
+            });
+            
+            winsGrid.style.display = 'grid';
+        }
+        
+        // Create individual win element
+        function createWinElement(win, itemNumber) {
+            const div = document.createElement('div');
+            div.className = 'win-item';
+            div.id = `win-${win.itemId}`;
+            
+            // Get artwork details
+            const artworkDetails = getArtworkDetails(win.itemId);
+            
+            div.innerHTML = `
+                <div class="win-badge">WON!</div>
+                
+                <div class="artwork-info">
+                    <div class="artist-name">${artworkDetails.artist}</div>
+                    <div class="artwork-title">"${artworkDetails.title}"</div>
+                </div>
+                
+                <div class="winning-bid">${win.winningBid} Pi</div>
+                
+                <div class="payment-section">
+                    <div class="payment-status ${getPaymentStatusClass(win.paymentStatus)}" id="paymentStatus-${win.itemId}">
+                        ${getPaymentStatusText(win.paymentStatus)}
+                    </div>
+                    
+                    ${win.paymentStatus === 'pending' ? `
+                        <div class="deadline-timer" id="timer-${win.itemId}">
+                            Calculating deadline...
+                        </div>
+                        
+                        <button class="pay-button" onclick="payForItem('${win.auctionId}', '${win.itemId}', ${win.winningBid})">
+                            Pay ${win.winningBid} Pi Now
+                        </button>
+                        
+                        <div class="payment-info">
+                            <strong>Payment Deadline:</strong> ${new Date(win.paymentDeadline).toLocaleString()}<br>
+                            <strong>Important:</strong> You must complete payment within 48 hours to secure your artwork.
+                        </div>
+                    ` : ''}
+                    
+                    ${win.paymentStatus === 'paid' ? `
+                        <div class="payment-info">
+                            <strong>Payment Completed:</strong> ${win.paidAt ? new Date(win.paidAt).toLocaleString() : 'Recently'}<br>
+                            <strong>Payment ID:</strong> ${win.paymentId}<br>
+                            <strong>Status:</strong> Artwork will be prepared for delivery/pickup.
+                        </div>
+                    ` : ''}
+                    
+                    ${win.paymentStatus === 'expired' ? `
+                        <div class="payment-info">
+                            <strong>Payment Expired:</strong> ${win.expiredAt ? new Date(win.expiredAt).toLocaleString() : 'Recently'}<br>
+                            <strong>Status:</strong> This item may be offered to the next highest bidder.
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            return div;
+        }
+        
+        // Get artwork details by item ID
+        function getArtworkDetails(itemId) {
+            const artworks = {
+                'item1': { artist: 'Hanoi Boi', title: 'Chomp Bomper One' },
+                'item2': { artist: 'Hanoi Boi', title: 'Chomp Bomper Two' },
+                'item3': { artist: 'Hanoi Boi', title: 'Chomp Bomper Three' },
+                'item4': { artist: 'Hanoi Boi', title: 'Chomp Bomper Four' },
+                'item5': { artist: 'Hanoi Boi', title: 'Chomp Bomper Five' }
+            };
+            
+            return artworks[itemId] || { artist: 'Unknown Artist', title: 'Unknown Artwork' };
+        }
+        
+        // Get payment status CSS class
+        function getPaymentStatusClass(status) {
+            const classes = {
+                'pending': 'payment-pending',
+                'paid': 'payment-paid',
+                'expired': 'payment-expired',
+                'failed': 'payment-expired'
+            };
+            
+            return classes[status] || 'payment-pending';
+        }
+        
+        // Get payment status text
+        function getPaymentStatusText(status) {
+            const texts = {
+                'pending': '⏰ Payment Pending',
+                'paid': '✅ Payment Completed',
+                'expired': '⏰ Payment Expired',
+                'failed': '❌ Payment Failed'
+            };
+            
+            return texts[status] || 'Unknown Status';
+        }
+        
+        // Start payment deadline timer
+        function startPaymentTimer(itemId, deadline) {
+            const deadlineDate = new Date(deadline);
+            
+            paymentTimers[itemId] = setInterval(() => {
+                const now = new Date();
+                const timeRemaining = deadlineDate.getTime() - now.getTime();
+                
+                const timerElement = document.getElementById(`timer-${itemId}`);
+                if (!timerElement) {
+                    clearInterval(paymentTimers[itemId]);
+                    return;
+                }
+                
+                if (timeRemaining <= 0) {
+                    timerElement.textContent = '⏰ Payment deadline has passed';
+                    timerElement.style.color = '#dc3545';
+                    clearInterval(paymentTimers[itemId]);
+                    
+                    // Disable payment button
+                    const payButton = document.querySelector(`#win-${itemId} .pay-button`);
+                    if (payButton) {
+                        payButton.disabled = true;
+                        payButton.textContent = 'Payment Expired';
+                    }
+                    
+                    return;
+                }
+                
+                // Calculate time remaining
+                const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
+                const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+                
+                timerElement.textContent = `⏰ ${hours}h ${minutes}m ${seconds}s remaining`;
+                
+                // Change color if less than 2 hours remaining
+                if (timeRemaining < 2 * 60 * 60 * 1000) {
+                    timerElement.style.color = '#dc3545';
+                } else if (timeRemaining < 6 * 60 * 60 * 1000) {
+                    timerElement.style.color = '#ff8800';
+                }
+                
+            }, 1000);
+        }
+        
+        // Pay for won item
+        async function payForItem(auctionId, itemId, amount) {
+            try {
+                console.log(`💰 Initiating payment for ${itemId}: ${amount} Pi`);
+                
+                // Create Pi payment
+                const payment = Pi.createPayment({
+                    amount: amount,
+                    memo: `Payment for auction item ${itemId}`,
+                    metadata: { auctionId, itemId }
+                });
+                
+                const paymentId = await payment.submit();
+                console.log(`✅ Payment submitted: ${paymentId}`);
+                
+                // Process payment on backend
+                const response = await fetch(`${CONFIG.BACKEND_URL}/pay-auction-win`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        auctionId: auctionId,
+                        itemId: itemId,
+                        paymentId: paymentId
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('✅ Payment processed successfully');
+                    
+                    // Update UI
+                    const paymentStatus = document.getElementById(`paymentStatus-${itemId}`);
+                    paymentStatus.textContent = '✅ Payment Completed';
+                    paymentStatus.className = 'payment-status payment-paid';
+                    
+                    // Clear timer
+                    if (paymentTimers[itemId]) {
+                        clearInterval(paymentTimers[itemId]);
+                    }
+                    
+                    // Reload page to show updated status
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                    
+                } else {
+                    throw new Error(result.error || 'Payment processing failed');
+                }
+                
+            } catch (error) {
+                console.error('❌ Payment failed:', error);
+                alert(`Payment failed: ${error.message}`);
+            }
+        }
+        
+        // Show error message
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

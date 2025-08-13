@@ -6,11 +6,13 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 const { MongoClient } = require('mongodb');
+const AuctionWinnerManager = require('./auction-winner.js');
 
 // MongoDB configuration
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DATABASE_NAME = 'pay_me_pi';
 let db;
+let winnerManager;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -91,6 +93,12 @@ async function connectToMongoDB() {
         db = client.db(DATABASE_NAME);
         console.log('✅ Connected to MongoDB at', MONGO_URI);
         console.log('📊 Database:', DATABASE_NAME);
+        
+        // Initialize winner manager
+        winnerManager = new AuctionWinnerManager(MONGO_URI, DATABASE_NAME);
+        await winnerManager.connect();
+        console.log('🏆 Winner management system initialized');
+        
     } catch (error) {
         console.error('❌ MongoDB connection failed:', error.message);
         console.log('⚠️  App will continue without database logging');
@@ -1693,6 +1701,135 @@ app.post('/close-auction', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
+// =============================================================================
+// AUCTION WINNER MANAGEMENT ENDPOINTS
+// =============================================================================
+
+// Calculate auction winners (admin endpoint)
+app.post('/calculate-winners/:auctionId', async (req, res) => {
+    try {
+        const { auctionId } = req.params;
+        
+        if (!winnerManager) {
+            throw new Error('Winner management system not initialized');
+        }
+        
+        console.log(`🏆 Calculating winners for auction: ${auctionId}`);
+        
+        const result = await winnerManager.calculateAuctionWinners(auctionId);
+        
+        res.json(result);
+        
+    } catch (error) {
+        console.error('❌ Error calculating winners:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get winners for a specific auction
+app.get('/auction-winners/:auctionId', async (req, res) => {
+    try {
+        const { auctionId } = req.params;
+        
+        if (!winnerManager) {
+            throw new Error('Winner management system not initialized');
+        }
+        
+        const winners = await winnerManager.getAuctionWinners(auctionId);
+        
+        res.json({ success: true, winners: winners });
+        
+    } catch (error) {
+        console.error('❌ Error getting auction winners:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get user's won items
+app.get('/user-wins/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        if (!winnerManager) {
+            throw new Error('Winner management system not initialized');
+        }
+        
+        const userWins = await winnerManager.getUserWins(username);
+        
+        res.json({ success: true, wins: userWins });
+        
+    } catch (error) {
+        console.error('❌ Error getting user wins:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Process payment for won item
+app.post('/pay-auction-win', async (req, res) => {
+    try {
+        const { auctionId, itemId, paymentId, txId } = req.body;
+        
+        if (!winnerManager) {
+            throw new Error('Winner management system not initialized');
+        }
+        
+        if (!auctionId || !itemId || !paymentId) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Missing required fields: auctionId, itemId, paymentId' 
+            });
+        }
+        
+        console.log(`💰 Processing payment for ${auctionId}/${itemId}: ${paymentId}`);
+        
+        const result = await winnerManager.processWinnerPayment(auctionId, itemId, paymentId, txId);
+        
+        res.json(result);
+        
+    } catch (error) {
+        console.error('❌ Error processing winner payment:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get pending payments (for deadline management)
+app.get('/pending-payments', async (req, res) => {
+    try {
+        if (!winnerManager) {
+            throw new Error('Winner management system not initialized');
+        }
+        
+        const pendingPayments = await winnerManager.getPendingPayments();
+        
+        res.json({ success: true, pendingPayments: pendingPayments });
+        
+    } catch (error) {
+        console.error('❌ Error getting pending payments:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Mark expired payments (admin endpoint)
+app.post('/mark-expired-payments', async (req, res) => {
+    try {
+        if (!winnerManager) {
+            throw new Error('Winner management system not initialized');
+        }
+        
+        const expiredCount = await winnerManager.markExpiredPayments();
+        
+        res.json({ success: true, expiredCount: expiredCount });
+        
+    } catch (error) {
+        console.error('❌ Error marking expired payments:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// =============================================================================
+// END AUCTION WINNER MANAGEMENT ENDPOINTS
+// =============================================================================
 
 // Helper function to check auction timing
 async function getAuctionStatus() {
