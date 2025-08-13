@@ -537,7 +537,8 @@ app.post('/approve-payment', async (req, res) => {
                             memo: paymentData.memo,
                             network: paymentData.network,
                             direction: paymentData.direction,
-                            orderId: paymentData.metadata?.orderId
+                            orderId: paymentData.metadata?.orderId,
+                            metadata: paymentData.metadata // Store full metadata including auction info
                         },
                         
                         // Technical Information
@@ -641,9 +642,14 @@ app.post('/complete-payment', async (req, res) => {
                     // Check if this is an auction winner payment
                     const isAuctionPayment = data.metadata?.type === 'auction_winner_payment' ||
                                            data.memo?.includes('auction item') ||
-                                           existingPayment?.paymentDetails?.memo?.includes('auction item');
+                                           data.memo?.includes('won auction item') ||
+                                           existingPayment?.paymentDetails?.memo?.includes('auction item') ||
+                                           existingPayment?.paymentDetails?.metadata?.type === 'auction_winner_payment';
 
                     console.log(`🔍 Payment type detection - Subscription: ${isSubscriptionPayment}, Auction: ${isAuctionPayment}`);
+                    console.log(`🔍 DEBUG - Payment metadata:`, data.metadata);
+                    console.log(`🔍 DEBUG - Payment memo:`, data.memo);
+                    console.log(`🔍 DEBUG - Existing payment metadata:`, existingPayment?.paymentDetails?.metadata);
 
                     // Update user profile with completed payment stats
                     if (username !== 'unknown') {
@@ -679,17 +685,44 @@ app.post('/complete-payment', async (req, res) => {
                         if (isAuctionPayment) {
                             console.log('🏆 Processing auction winner payment completion...');
                             try {
-                                // Extract auction metadata from payment
-                                const auctionData = data.metadata || existingPayment?.paymentDetails?.metadata || {};
-                                const winnerId = auctionData.winnerId;
-                                const itemId = auctionData.itemId;
+                                // Extract auction metadata from payment - check multiple sources
+                                const auctionData = data.metadata || 
+                                                  existingPayment?.paymentDetails?.metadata || 
+                                                  {};
+                                
+                                let winnerId = auctionData.winnerId;
+                                let itemId = auctionData.itemId;
                                 const auctionId = auctionData.auctionId || 'auction_1';
+
+                                // If metadata is missing, try to extract from memo
+                                if (!winnerId && data.memo) {
+                                    const memoMatch = data.memo.match(/won auction item: (\w+)/);
+                                    if (memoMatch) {
+                                        itemId = memoMatch[1];
+                                        
+                                        // Find the winner record by itemId and username
+                                        const winnersCollection = db.collection('auction_winners');
+                                        const winnerRecord = await winnersCollection.findOne({
+                                            winnerUsername: username,
+                                            itemId: itemId,
+                                            paymentStatus: 'pending'
+                                        });
+                                        
+                                        if (winnerRecord) {
+                                            winnerId = winnerRecord._id.toString();
+                                            console.log(`🔍 DEBUG - Found winner record via memo: ${winnerId} for ${itemId}`);
+                                        }
+                                    }
+                                }
 
                                 console.log(`🔍 Auction payment data - Winner ID: ${winnerId}, Item: ${itemId}, Auction: ${auctionId}`);
 
                                 if (winnerId) {
                                     // Update auction winner record with payment completion
                                     const { ObjectId } = require('mongodb');
+                                    
+                                    console.log(`🔍 DEBUG - Attempting to update winner record with ID: ${winnerId}`);
+                                    
                                     const updateResult = await db.collection('auction_winners').updateOne(
                                         { _id: new ObjectId(winnerId) },
                                         {
@@ -709,6 +742,8 @@ app.post('/complete-payment', async (req, res) => {
                                             }
                                         }
                                     );
+
+                                    console.log(`🔍 DEBUG - Update result: matched=${updateResult.matchedCount}, modified=${updateResult.modifiedCount}`);
 
                                     if (updateResult.modifiedCount > 0) {
                                         console.log(`✅ Auction winner payment completed for ${username} - Item: ${itemId}`);
@@ -2329,6 +2364,41 @@ app.post('/access-digital-art', async (req, res) => {
         
     } catch (error) {
         console.error('❌ Error accessing digital art:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// DEBUG: Check auction winners collection
+app.get('/debug/auction-winners', async (req, res) => {
+    try {
+        console.log('🔍 DEBUG - Checking auction winners collection...');
+        
+        const winnersCollection = db.collection('auction_winners');
+        const allWinners = await winnersCollection.find({}).toArray();
+        
+        console.log(`🔍 DEBUG - Found ${allWinners.length} total winner records`);
+        
+        const debugData = {
+            totalWinners: allWinners.length,
+            winners: allWinners.map(winner => ({
+                _id: winner._id,
+                winnerUsername: winner.winnerUsername,
+                itemId: winner.itemId,
+                auctionId: winner.auctionId,
+                winningBid: winner.winningBid,
+                paymentStatus: winner.paymentStatus,
+                paymentId: winner.paymentId || null,
+                paidAt: winner.paidAt || null,
+                digitalArtStatus: winner.digitalArtStatus || null
+            }))
+        };
+        
+        console.log('🔍 DEBUG - Winner data:', debugData);
+        
+        res.json({ success: true, debug: debugData });
+        
+    } catch (error) {
+        console.error('❌ Error getting debug auction winners:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
