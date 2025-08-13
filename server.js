@@ -1588,6 +1588,10 @@ app.post('/place-auction-bid', async (req, res) => {
         
         console.log(`✅ Bid placed successfully: ${username} - ${bidAmount} Pi on ${itemId}`);
         
+        // DEBUG: Check total bids after this insertion
+        const totalBids = await db.collection('auction_bids').countDocuments({ auctionId: 'auction_1', status: 'active' });
+        console.log(`🔍 DEBUG - Total active bids for auction_1: ${totalBids}`);
+        
         // Log activity
         await db.collection('user_activities').insertOne({
             username: username,
@@ -1711,18 +1715,74 @@ app.post('/calculate-winners/:auctionId', async (req, res) => {
     try {
         const { auctionId } = req.params;
         
+        console.log(`🔍 DEBUG - Manual winner calculation requested for: ${auctionId}`);
+        
         if (!winnerManager) {
             throw new Error('Winner management system not initialized');
         }
+        
+        // Check current bid count before calculation
+        const bidsCollection = db.collection('auction_bids');
+        const totalBids = await bidsCollection.countDocuments({ auctionId: auctionId, status: 'active' });
+        console.log(`🔍 DEBUG - Found ${totalBids} active bids for ${auctionId} before calculation`);
         
         console.log(`🏆 Calculating winners for auction: ${auctionId}`);
         
         const result = await winnerManager.calculateAuctionWinners(auctionId);
         
+        console.log(`🔍 DEBUG - Manual calculation result:`, result);
+        
         res.json(result);
         
     } catch (error) {
         console.error('❌ Error calculating winners:', error);
+        console.error('❌ Error details:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get/trigger auction winner calculation (GET endpoint for frontend debugging)
+app.get('/calculate-winners/:auctionId', async (req, res) => {
+    try {
+        const { auctionId } = req.params;
+        
+        console.log(`🔍 DEBUG - Frontend winner check requested for: ${auctionId}`);
+        
+        if (!winnerManager) {
+            throw new Error('Winner management system not initialized');
+        }
+        
+        // First check if winners already exist
+        const winnersCollection = db.collection('auction_winners');
+        const existingWinners = await winnersCollection.find({ auctionId: auctionId }).toArray();
+        
+        if (existingWinners.length > 0) {
+            console.log(`🔍 DEBUG - Found ${existingWinners.length} existing winners for ${auctionId}`);
+            return res.json({ 
+                success: true, 
+                winnersCount: existingWinners.length,
+                winners: existingWinners.map(w => ({
+                    itemId: w.itemId,
+                    winner: w.winnerUsername,
+                    winningBid: w.winningBid
+                })),
+                message: 'Winners already calculated'
+            });
+        }
+        
+        // No winners exist, calculate them
+        const bidsCollection = db.collection('auction_bids');
+        const totalBids = await bidsCollection.countDocuments({ auctionId: auctionId, status: 'active' });
+        console.log(`🔍 DEBUG - No existing winners, found ${totalBids} active bids for calculation`);
+        
+        const result = await winnerManager.calculateAuctionWinners(auctionId);
+        console.log(`🔍 DEBUG - Frontend-triggered calculation result:`, result);
+        
+        res.json(result);
+        
+    } catch (error) {
+        console.error('❌ Error in frontend winner check:', error);
+        console.error('❌ Error details:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -1751,16 +1811,37 @@ app.get('/user-wins/:username', async (req, res) => {
     try {
         const { username } = req.params;
         
+        console.log(`🔍 DEBUG - Checking wins for user: ${username}`);
+        
         if (!winnerManager) {
             throw new Error('Winner management system not initialized');
         }
         
+        // Debug: Check auction_winners collection directly
+        const winnersCollection = db.collection('auction_winners');
+        const allWinners = await winnersCollection.find({}).toArray();
+        console.log(`🔍 DEBUG - Total winners in database: ${allWinners.length}`);
+        
+        const userWinners = await winnersCollection.find({ winnerUsername: username }).toArray();
+        console.log(`🔍 DEBUG - Direct database query found ${userWinners.length} wins for ${username}`);
+        
+        if (userWinners.length > 0) {
+            console.log(`🔍 DEBUG - User wins from database:`, userWinners.map(w => ({
+                itemId: w.itemId,
+                winningBid: w.winningBid,
+                paymentStatus: w.paymentStatus
+            })));
+        }
+        
         const userWins = await winnerManager.getUserWins(username);
+        
+        console.log(`🔍 DEBUG - Winner manager returned ${userWins ? userWins.length : 0} wins for ${username}`);
         
         res.json({ success: true, wins: userWins });
         
     } catch (error) {
         console.error('❌ Error getting user wins:', error);
+        console.error('❌ Error details:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -1827,6 +1908,48 @@ app.post('/mark-expired-payments', async (req, res) => {
     }
 });
 
+// DEBUG: Get all auction data (for troubleshooting)
+app.get('/debug/auction-data', async (req, res) => {
+    try {
+        console.log('🔍 DEBUG - Auction data debug endpoint called');
+        
+        const bidsCollection = db.collection('auction_bids');
+        const winnersCollection = db.collection('auction_winners');
+        
+        const allBids = await bidsCollection.find({ auctionId: 'auction_1' }).toArray();
+        const allWinners = await winnersCollection.find({ auctionId: 'auction_1' }).toArray();
+        
+        const auctionStatus = await getAuctionStatus();
+        
+        const debugData = {
+            auctionStatus: auctionStatus,
+            totalBids: allBids.length,
+            bids: allBids.map(bid => ({
+                username: bid.username,
+                itemId: bid.itemId,
+                bidAmount: bid.bidAmount,
+                timestamp: bid.timestamp,
+                status: bid.status
+            })),
+            totalWinners: allWinners.length,
+            winners: allWinners.map(winner => ({
+                winnerUsername: winner.winnerUsername,
+                itemId: winner.itemId,
+                winningBid: winner.winningBid,
+                paymentStatus: winner.paymentStatus
+            }))
+        };
+        
+        console.log('🔍 DEBUG - Auction data:', debugData);
+        
+        res.json({ success: true, debug: debugData });
+        
+    } catch (error) {
+        console.error('❌ Error getting debug auction data:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // =============================================================================
 // END AUCTION WINNER MANAGEMENT ENDPOINTS
 // =============================================================================
@@ -1863,23 +1986,53 @@ async function getAuctionStatus() {
             timeRemaining: 0
         };
     } else if (now > auctionEnd) {
+        console.log('🔍 DEBUG - Auction has ended, checking for existing winners...');
+        
         // Check if winners have been calculated for this auction
         const winnersCollection = db.collection('auction_winners');
         const existingWinners = await winnersCollection.find({ auctionId: 'auction_1' }).toArray();
         
+        console.log(`🔍 DEBUG - Found ${existingWinners.length} existing winners in database`);
+        
         // If no winners exist yet, calculate them automatically
         if (existingWinners.length === 0) {
-            console.log('🏆 Auction ended - automatically calculating winners...');
+            console.log('🏆 DEBUG - No winners found, automatically calculating winners...');
+            
+            // First, check if there are any bids to calculate winners from
+            const bidsCollection = db.collection('auction_bids');
+            const allBids = await bidsCollection.find({ auctionId: 'auction_1', status: 'active' }).toArray();
+            console.log(`🔍 DEBUG - Found ${allBids.length} active bids for auction_1`);
+            
+            if (allBids.length > 0) {
+                console.log('📋 DEBUG - Bid details:');
+                allBids.forEach(bid => {
+                    console.log(`   - ${bid.username}: ${bid.bidAmount} Pi for ${bid.itemId}`);
+                });
+            }
+            
             try {
                 const AuctionWinnerManager = require('./auction-winner.js');
-                const winnerManager = new AuctionWinnerManager(process.env.MONGODB_URI || 'mongodb://localhost:27017', 'piauction');
+                const winnerManager = new AuctionWinnerManager(process.env.MONGODB_URI || 'mongodb://localhost:27017', 'pay_me_pi');
                 await winnerManager.connect();
                 const result = await winnerManager.calculateAuctionWinners('auction_1');
                 await winnerManager.disconnect();
-                console.log('✅ Winners automatically calculated:', result);
+                console.log('✅ DEBUG - Winner calculation completed:', result);
+                
+                if (result.success && result.winnersCount > 0) {
+                    console.log('🎉 DEBUG - Winners successfully created and stored in database!');
+                } else {
+                    console.log('⚠️ DEBUG - Winner calculation returned no winners');
+                }
             } catch (error) {
-                console.error('❌ Error auto-calculating winners:', error);
+                console.error('❌ DEBUG - Error auto-calculating winners:', error);
+                console.error('❌ DEBUG - Error details:', error.message);
+                console.error('❌ DEBUG - Error stack:', error.stack);
             }
+        } else {
+            console.log('✅ DEBUG - Winners already exist in database, skipping calculation');
+            existingWinners.forEach(winner => {
+                console.log(`   - ${winner.winnerUsername}: ${winner.winningBid} Pi for ${winner.itemId}`);
+            });
         }
         
         return {

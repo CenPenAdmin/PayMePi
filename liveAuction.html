@@ -276,6 +276,15 @@
             </div>
         </div>
         
+        <!-- Debug Panel (for troubleshooting) -->
+        <div id="debugPanel" style="display: none; margin: 20px 0; padding: 15px; background: #f8f8f8; border: 2px solid #999; border-radius: 8px;">
+            <h3 style="margin-top: 0; color: #666;">🔍 Debug Information</h3>
+            <button onclick="toggleDebugPanel()" style="background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh Debug Data</button>
+            <div id="debugContent" style="margin-top: 10px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; background: white; padding: 10px; border: 1px solid #ddd;">
+                Loading debug information...
+            </div>
+        </div>
+        
         <div class="user-info">
             <div id="userStatus">Loading user status...</div>
         </div>
@@ -396,6 +405,7 @@
         // Start auction timer using server's fixed timestamp
         async function startAuctionTimer() {
             try {
+                console.log('🔄 Fetching auction status from server...');
                 const response = await fetch(`${CONFIG.BACKEND_URL}/auction-status`, {
                     headers: { 'ngrok-skip-browser-warning': 'true' }
                 });
@@ -406,6 +416,14 @@
                     
                     console.log('🕐 Auction 1 status from server:', status);
                     console.log('🕐 Server says auction ends at:', serverAuctionEndTime.toLocaleString());
+                    console.log('🔍 DEBUG - Auction status:', status.status);
+                    console.log('🔍 DEBUG - Is auction active:', status.isActive);
+                    
+                    // If auction has ended, check for winner creation
+                    if (status.status === 'ended') {
+                        console.log('🏆 DEBUG - Auction has ended, checking for winners...');
+                        setTimeout(checkWinnerCreation, 2000); // Give server time to calculate winners
+                    }
                     
                     updateTimerDisplay(status);
                     
@@ -413,6 +431,7 @@
                     if (timerInterval) clearInterval(timerInterval);
                     timerInterval = setInterval(updateCountdown, 1000);
                 } else {
+                    console.error('❌ Failed to fetch auction status - Response not OK:', response.status);
                     document.getElementById('timerMessage').textContent = 'Unable to load auction status';
                 }
             } catch (error) {
@@ -451,11 +470,15 @@
             
             if (timeRemaining <= 0) {
                 // Auction ended
+                console.log('🏆 DEBUG - Countdown detected auction end, checking winners...');
                 document.getElementById('timerDisplay').textContent = 'AUCTION 1 ENDED';
                 document.getElementById('timerDisplay').style.color = '#dc3545';
                 document.getElementById('timerMessage').textContent = 'Bidding is now closed';
                 clearInterval(timerInterval);
                 disableAllBidding();
+                
+                // Check for winner creation after a short delay
+                setTimeout(checkWinnerCreation, 3000);
                 return;
             }
             
@@ -473,6 +496,54 @@
             }
             
             document.getElementById('timerDisplay').textContent = displayTime;
+        }
+        
+        // Debug function to check if winners were created after auction ends
+        async function checkWinnerCreation() {
+            try {
+                console.log('🔍 DEBUG - Checking if winners were created...');
+                
+                // Check if any winners exist for auction_1
+                const response = await fetch(`${CONFIG.BACKEND_URL}/calculate-winners/auction_1`, {
+                    method: 'GET',
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('🏆 DEBUG - Winner calculation result:', result);
+                    
+                    if (result.success && result.winnersCount > 0) {
+                        console.log('✅ DEBUG - Winners successfully created:', result.winners);
+                    } else {
+                        console.log('⚠️ DEBUG - No winners found or created');
+                    }
+                } else {
+                    console.error('❌ DEBUG - Failed to check winners:', response.status);
+                }
+                
+                // Also check current user's wins
+                if (currentUsername) {
+                    console.log(`🔍 DEBUG - Checking wins for user: ${currentUsername}`);
+                    const userWinsResponse = await fetch(`${CONFIG.BACKEND_URL}/user-wins/${currentUsername}`, {
+                        headers: { 'ngrok-skip-browser-warning': 'true' }
+                    });
+                    
+                    if (userWinsResponse.ok) {
+                        const userWins = await userWinsResponse.json();
+                        console.log('🏆 DEBUG - User wins:', userWins);
+                        
+                        if (userWins.success && userWins.wins && userWins.wins.length > 0) {
+                            console.log('🎉 DEBUG - User has wins! Golden banner should appear.');
+                        } else {
+                            console.log('📝 DEBUG - User has no wins.');
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('❌ DEBUG - Error checking winner creation:', error);
+            }
         }
         
         // Disable all bidding when auction ends
@@ -775,6 +846,80 @@
                 window.location.href = 'auctionPayment.html';
             }
         }
+        
+        // Debug functions
+        async function toggleDebugPanel() {
+            const panel = document.getElementById('debugPanel');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                await loadDebugData();
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+        
+        async function loadDebugData() {
+            const debugContent = document.getElementById('debugContent');
+            debugContent.textContent = 'Loading debug data...';
+            
+            try {
+                console.log('🔍 DEBUG - Loading debug data...');
+                
+                const response = await fetch(`${CONFIG.BACKEND_URL}/debug/auction-data`, {
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('🔍 DEBUG - Debug data received:', data);
+                    
+                    let debugText = `=== AUCTION DEBUG INFORMATION ===\n\n`;
+                    debugText += `Current Time: ${new Date().toLocaleString()}\n`;
+                    debugText += `Username: ${currentUsername || 'Not set'}\n\n`;
+                    
+                    debugText += `=== AUCTION STATUS ===\n`;
+                    debugText += `Status: ${data.debug.auctionStatus.status}\n`;
+                    debugText += `Is Active: ${data.debug.auctionStatus.isActive}\n`;
+                    debugText += `End Time: ${new Date(data.debug.auctionStatus.endTime).toLocaleString()}\n`;
+                    debugText += `Message: ${data.debug.auctionStatus.message}\n\n`;
+                    
+                    debugText += `=== BIDS (${data.debug.totalBids}) ===\n`;
+                    if (data.debug.bids.length > 0) {
+                        data.debug.bids.forEach(bid => {
+                            debugText += `${bid.username}: ${bid.bidAmount} Pi on ${bid.itemId} (${bid.status})\n`;
+                        });
+                    } else {
+                        debugText += 'No bids found\n';
+                    }
+                    
+                    debugText += `\n=== WINNERS (${data.debug.totalWinners}) ===\n`;
+                    if (data.debug.winners.length > 0) {
+                        data.debug.winners.forEach(winner => {
+                            debugText += `${winner.winnerUsername}: ${winner.winningBid} Pi for ${winner.itemId} (${winner.paymentStatus})\n`;
+                        });
+                    } else {
+                        debugText += 'No winners found in database\n';
+                    }
+                    
+                    debugContent.textContent = debugText;
+                } else {
+                    debugContent.textContent = `Error loading debug data: ${response.status}`;
+                }
+            } catch (error) {
+                console.error('❌ Error loading debug data:', error);
+                debugContent.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        // Add debug panel toggle button (show when URL contains debug=true)
+        window.addEventListener('load', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('debug') === 'true') {
+                const debugPanel = document.getElementById('debugPanel');
+                debugPanel.style.display = 'block';
+                loadDebugData();
+            }
+        });
     </script>
 </body>
 </html>
