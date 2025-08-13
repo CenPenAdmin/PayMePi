@@ -1863,6 +1863,25 @@ async function getAuctionStatus() {
             timeRemaining: 0
         };
     } else if (now > auctionEnd) {
+        // Check if winners have been calculated for this auction
+        const winnersCollection = db.collection('auction_winners');
+        const existingWinners = await winnersCollection.find({ auctionId: 'auction_1' }).toArray();
+        
+        // If no winners exist yet, calculate them automatically
+        if (existingWinners.length === 0) {
+            console.log('🏆 Auction ended - automatically calculating winners...');
+            try {
+                const AuctionWinnerManager = require('./auction-winner.js');
+                const winnerManager = new AuctionWinnerManager(process.env.MONGODB_URI || 'mongodb://localhost:27017', 'piauction');
+                await winnerManager.connect();
+                const result = await winnerManager.calculateAuctionWinners('auction_1');
+                await winnerManager.disconnect();
+                console.log('✅ Winners automatically calculated:', result);
+            } catch (error) {
+                console.error('❌ Error auto-calculating winners:', error);
+            }
+        }
+        
         return {
             isActive: false,
             status: 'ended',
