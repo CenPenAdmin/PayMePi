@@ -1478,6 +1478,262 @@ app.post('/migrate-data', async (req, res) => {
     }
 });
 
+// ========================================
+// AUCTION BIDDING ENDPOINTS
+// ========================================
+
+// Get user's auction bids
+app.get('/auction-bids/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        console.log(`📊 Getting auction bids for user: ${username}`);
+        
+        const userBids = await db.collection('auction_bids').find({ 
+            username: username 
+        }).toArray();
+        
+        console.log(`📊 Found ${userBids.length} bids for ${username}`);
+        res.json(userBids);
+        
+    } catch (error) {
+        console.error('❌ Error getting auction bids:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Place an auction bid
+app.post('/place-auction-bid', async (req, res) => {
+    try {
+        const { username, userUid, itemId, bidAmount, timestamp } = req.body;
+        
+        console.log(`🎯 Processing bid: ${username} bidding ${bidAmount} Pi on ${itemId}`);
+        
+        // Validate required fields
+        if (!username || !userUid || !itemId || !bidAmount) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Missing required fields: username, userUid, itemId, bidAmount' 
+            });
+        }
+        
+        // Validate minimum bid amount
+        if (bidAmount < 3) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Minimum bid amount is 3 Pi' 
+            });
+        }
+        
+        // Check if user already has a bid for this item
+        const existingUserBid = await db.collection('auction_bids').findOne({
+            username: username,
+            itemId: itemId
+        });
+        
+        if (existingUserBid) {
+            console.log(`❌ User ${username} already has a bid on ${itemId}`);
+            return res.status(400).json({ 
+                success: false, 
+                error: 'You have already placed a bid on this item' 
+            });
+        }
+        
+        // Check if the exact bid amount already exists for this item
+        const existingBidAmount = await db.collection('auction_bids').findOne({
+            itemId: itemId,
+            bidAmount: bidAmount
+        });
+        
+        if (existingBidAmount) {
+            console.log(`❌ Bid amount ${bidAmount} already exists for ${itemId}`);
+            return res.status(400).json({ 
+                success: false, 
+                error: `Bid amount ${bidAmount} Pi already exists for this item. Please enter a different amount.` 
+            });
+        }
+        
+        // Check if auction is currently active
+        const auctionStatus = await getAuctionStatus();
+        if (!auctionStatus.isActive) {
+            return res.status(400).json({ 
+                success: false, 
+                error: auctionStatus.message 
+            });
+        }
+        
+        // Create bid record
+        const bidRecord = {
+            username: username,
+            userUid: userUid,
+            itemId: itemId,
+            bidAmount: parseFloat(bidAmount),
+            timestamp: timestamp || new Date().toISOString(),
+            auctionId: 'auction_1', // For future multiple auctions
+            status: 'active',
+            createdAt: new Date(),
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent')
+        };
+        
+        // Insert bid into database
+        await db.collection('auction_bids').insertOne(bidRecord);
+        
+        console.log(`✅ Bid placed successfully: ${username} - ${bidAmount} Pi on ${itemId}`);
+        
+        // Log activity
+        await db.collection('user_activities').insertOne({
+            username: username,
+            userUid: userUid,
+            action: 'auction_bid_placed',
+            details: {
+                itemId: itemId,
+                bidAmount: bidAmount,
+                auctionId: 'auction_1'
+            },
+            timestamp: new Date(),
+            ipAddress: req.ip
+        });
+        
+        res.json({ 
+            success: true, 
+            message: 'Bid placed successfully',
+            bidId: bidRecord._id,
+            bidAmount: bidAmount,
+            itemId: itemId
+        });
+        
+    } catch (error) {
+        console.error('❌ Error placing auction bid:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get auction status and timing
+app.get('/auction-status', async (req, res) => {
+    try {
+        const auctionStatus = await getAuctionStatus();
+        res.json(auctionStatus);
+    } catch (error) {
+        console.error('❌ Error getting auction status:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get current highest bids for all items
+app.get('/auction-highest-bids', async (req, res) => {
+    try {
+        console.log('📊 Getting highest bids for all auction items...');
+        
+        const items = ['item1', 'item2', 'item3', 'item4', 'item5'];
+        const highestBids = {};
+        
+        for (const itemId of items) {
+            const highestBid = await db.collection('auction_bids')
+                .findOne({ itemId: itemId }, { sort: { bidAmount: -1 } });
+            
+            highestBids[itemId] = highestBid || { bidAmount: 0, username: null };
+        }
+        
+        console.log('📊 Current highest bids:', highestBids);
+        res.json({ success: true, highestBids: highestBids });
+        
+    } catch (error) {
+        console.error('❌ Error getting highest bids:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Close auction and determine winners (admin endpoint)
+app.post('/close-auction', async (req, res) => {
+    try {
+        console.log('🏁 Closing auction and determining winners...');
+        
+        const items = ['item1', 'item2', 'item3', 'item4', 'item5'];
+        const winners = {};
+        
+        for (const itemId of items) {
+            const highestBid = await db.collection('auction_bids')
+                .findOne({ itemId: itemId }, { sort: { bidAmount: -1 } });
+            
+            if (highestBid) {
+                winners[itemId] = {
+                    winner: highestBid.username,
+                    winningBid: highestBid.bidAmount,
+                    userUid: highestBid.userUid,
+                    bidId: highestBid._id
+                };
+                
+                // Mark the winning bid
+                await db.collection('auction_bids').updateOne(
+                    { _id: highestBid._id },
+                    { $set: { status: 'winner', closedAt: new Date() } }
+                );
+                
+                // Mark all other bids for this item as 'lost'
+                await db.collection('auction_bids').updateMany(
+                    { itemId: itemId, _id: { $ne: highestBid._id } },
+                    { $set: { status: 'lost', closedAt: new Date() } }
+                );
+            }
+        }
+        
+        // Create auction results record
+        await db.collection('auction_results').insertOne({
+            auctionId: 'auction_1',
+            winners: winners,
+            closedAt: new Date(),
+            status: 'closed'
+        });
+        
+        console.log('🏆 Auction closed successfully. Winners:', winners);
+        res.json({ success: true, winners: winners });
+        
+    } catch (error) {
+        console.error('❌ Error closing auction:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Helper function to check auction timing
+async function getAuctionStatus() {
+    // For now, we'll use a simple time-based system
+    // You can modify these dates to control auction timing
+    const auctionStart = new Date('2025-08-12T00:00:00Z'); // Start date
+    const auctionEnd = new Date('2025-08-20T23:59:59Z');   // End date
+    const now = new Date();
+    
+    if (now < auctionStart) {
+        return {
+            isActive: false,
+            status: 'not_started',
+            message: 'Auction has not started yet',
+            startTime: auctionStart.toISOString(),
+            endTime: auctionEnd.toISOString()
+        };
+    } else if (now > auctionEnd) {
+        return {
+            isActive: false,
+            status: 'ended',
+            message: 'Auction has ended',
+            startTime: auctionStart.toISOString(),
+            endTime: auctionEnd.toISOString()
+        };
+    } else {
+        return {
+            isActive: true,
+            status: 'active',
+            message: 'Auction is currently active',
+            startTime: auctionStart.toISOString(),
+            endTime: auctionEnd.toISOString(),
+            timeRemaining: auctionEnd.getTime() - now.getTime()
+        };
+    }
+}
+
+// ========================================
+// TEST ENDPOINTS
+// ========================================
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ 
