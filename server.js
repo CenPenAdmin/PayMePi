@@ -1750,12 +1750,18 @@ app.get('/auction-winners/:auctionId', async (req, res) => {
 app.get('/user-wins/:username', async (req, res) => {
     try {
         const { username } = req.params;
+        console.log(`🏆 Getting wins for user: ${username}`);
         
         if (!winnerManager) {
+            console.error('❌ Winner management system not initialized');
             throw new Error('Winner management system not initialized');
         }
         
+        console.log(`🔍 Calling winnerManager.getUserWins(${username})`);
         const userWins = await winnerManager.getUserWins(username);
+        
+        console.log(`📊 Found ${userWins.length} wins for ${username}`);
+        console.log('📋 Wins data:', JSON.stringify(userWins, null, 2));
         
         res.json({ success: true, wins: userWins });
         
