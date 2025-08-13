@@ -2429,12 +2429,20 @@ async function getAuctionStatus() {
     // Auction 1 - Fixed timestamps that don't change when users enter/leave
     const now = new Date();
     
-    // Set auction end time to tomorrow at 3:50 PM to ensure it's active for testing
+    // 🎯 AUCTION TIMING CONFIGURATION - UPDATE THESE LINES FOR TESTING
+    // ================================================================
+    // Set auction end time to TODAY at 4:55 PM
     const auctionEnd = new Date();
-    auctionEnd.setDate(auctionEnd.getDate() + 1); // Tomorrow
-    auctionEnd.setHours(15, 50, 0, 0); // 3:50 PM tomorrow
+    auctionEnd.setDate(auctionEnd.getDate()); // Today (change to +1 for tomorrow, +2 for day after, etc.)
+    auctionEnd.setHours(16, 55, 0, 0); // 4:55 PM (change hours: 16=4PM, 17=5PM, etc. minutes: 55, 0, 30, etc.)
+    
+    // FUTURE TESTING EXAMPLES:
+    // Tomorrow at 5:30 PM: auctionEnd.setDate(auctionEnd.getDate() + 1); auctionEnd.setHours(17, 30, 0, 0);
+    // Today at 6:00 PM: auctionEnd.setDate(auctionEnd.getDate()); auctionEnd.setHours(18, 0, 0, 0);
+    // Next week same time: auctionEnd.setDate(auctionEnd.getDate() + 7); auctionEnd.setHours(16, 55, 0, 0);
+    // ================================================================
 
-    // Set auction start time to 24 hours before end (started today at 3:50 PM)
+    // Set auction start time to 24 hours before end
     const auctionStart = new Date(auctionEnd.getTime() - (24 * 60 * 60 * 1000));
     
     const timeRemaining = auctionEnd.getTime() - now.getTime();
