@@ -563,7 +563,7 @@
             
             // Check if auction is still active
             const now = new Date();
-            if (auctionEndTime && now >= auctionEndTime) {
+            if (serverAuctionEndTime && now >= serverAuctionEndTime) {
                 alert('Auction has ended. No more bids can be placed.');
                 return;
             }
