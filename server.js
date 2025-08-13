@@ -1959,11 +1959,11 @@ async function getAuctionStatus() {
     // Auction 1 - Fixed timestamps that don't change when users enter/leave
     const now = new Date();
     
-    // Set auction end time to 1:05 PM today
+    // Set auction end time to 1:50 PM today
     const auctionEnd = new Date();
-    auctionEnd.setHours(13, 5, 0, 0); // 1:05 PM today
+    auctionEnd.setHours(13, 50, 0, 0); // 1:50 PM today
     
-    // Set auction start time to 24 hours before end (started yesterday at 1:05 PM)
+    // Set auction start time to 24 hours before end (started yesterday at 1:50 PM)
     const auctionStart = new Date(auctionEnd.getTime() - (24 * 60 * 60 * 1000));
     
     const timeRemaining = auctionEnd.getTime() - now.getTime();
