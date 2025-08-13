@@ -333,6 +333,8 @@
         // Load user's auction wins
         async function loadUserWins() {
             try {
+                console.log(`🔄 Loading wins for user: ${piUser.username}`);
+                
                 const response = await fetch(`${CONFIG.BACKEND_URL}/user-wins/${piUser.username}`, {
                     headers: {
                         'ngrok-skip-browser-warning': 'true'
@@ -348,6 +350,12 @@
                 if (result.success) {
                     userWins = result.wins;
                     console.log(`🏆 Found ${userWins.length} wins for ${piUser.username}`);
+                    
+                    // Log payment status of each win for debugging
+                    userWins.forEach(win => {
+                        console.log(`   - ${win.itemId}: ${win.paymentStatus} (${win.winningBid} Pi)`);
+                    });
+                    
                     displayWins();
                 } else {
                     throw new Error(result.error || 'Failed to load wins');
@@ -689,20 +697,15 @@
                 const result = await response.json();
                 console.log(`✅ Payment completed:`, result);
                 
-                // Update UI to show success - find the payment status by matching the winner record
+                // Update the global userWins data immediately
                 const winRecord = userWins.find(win => win._id === winnerId);
                 if (winRecord) {
-                    const paymentStatus = document.getElementById(`paymentStatus-${winRecord.itemId}`);
-                    const paymentButton = document.querySelector(`[onclick*="'${winRecord.itemId}'"]`);
+                    // Update the payment status in our local data
+                    winRecord.paymentStatus = 'paid';
+                    winRecord.paidAt = new Date().toISOString();
+                    winRecord.paymentId = paymentId;
                     
-                    if (paymentStatus) {
-                        paymentStatus.textContent = '✅ Payment Completed! Digital art ready.';
-                        paymentStatus.className = 'payment-status payment-paid';
-                    }
-                    
-                    if (paymentButton) {
-                        paymentButton.style.display = 'none';
-                    }
+                    console.log(`🔄 Updated local win record for ${winRecord.itemId}`);
                 }
                 
                 // Clear any running timers
@@ -712,12 +715,28 @@
                     }
                 });
                 
-                // Show success message and reload
+                // Show success message
                 alert('🎉 Payment completed successfully! Your digital artwork is now ready.');
                 
-                setTimeout(() => {
-                    location.reload();
-                }, 2000);
+                // Show loading indicator
+                const loadingMessage = document.getElementById('loadingMessage');
+                if (loadingMessage) {
+                    loadingMessage.textContent = 'Updating payment status...';
+                    loadingMessage.style.display = 'block';
+                }
+                
+                // Refresh the wins data from server and redisplay
+                setTimeout(async () => {
+                    try {
+                        console.log('🔄 Refreshing wins data after payment completion...');
+                        await loadUserWins(); // This will fetch fresh data and redisplay
+                        console.log('✅ Wins data refreshed successfully');
+                    } catch (error) {
+                        console.error('❌ Failed to refresh wins data:', error);
+                        // Fallback: reload the page if refresh fails
+                        location.reload();
+                    }
+                }, 1000);
                 
                 return result;
                 
