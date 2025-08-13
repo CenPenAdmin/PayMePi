@@ -201,6 +201,13 @@
     <div class="auction-container">
         <div class="auction-title">Live Art Auction</div>
         
+        <!-- Auction Timer -->
+        <div id="auctionTimer" style="text-align: center; margin: 20px 0; padding: 15px; background: #f8f9fa; border: 2px solid #030006; border-radius: 8px;">
+            <div style="font-size: 1.2em; font-weight: bold; color: #030006;">Auction Status</div>
+            <div id="timerDisplay" style="font-size: 1.5em; font-weight: bold; color: #ff4444; margin: 10px 0;">Loading...</div>
+            <div id="timerMessage" style="font-size: 1em; color: #666;">Checking auction status...</div>
+        </div>
+        
         <div class="user-info">
             <div id="userStatus">Loading user status...</div>
         </div>
@@ -308,12 +315,97 @@
     <script>
         let piUser = null;
         let userBids = {}; // Track user's bids per item
+        let auctionEndTime = null;
+        let timerInterval = null;
         
         // Initialize page
         window.addEventListener('load', function() {
             console.log('🔄 Live Auction page loaded');
+            startAuctionTimer();
             authenticateAndCheckSubscription();
         });
+        
+        // Start auction timer
+        async function startAuctionTimer() {
+            try {
+                const response = await fetch(`${CONFIG.BACKEND_URL}/auction-status`, {
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
+                
+                if (response.ok) {
+                    const status = await response.json();
+                    auctionEndTime = new Date(status.endTime);
+                    
+                    console.log('🕐 Auction status:', status);
+                    console.log('🕐 Auction ends at:', auctionEndTime.toLocaleTimeString());
+                    
+                    updateTimerDisplay(status);
+                    
+                    // Start countdown timer
+                    timerInterval = setInterval(updateCountdown, 1000);
+                } else {
+                    document.getElementById('timerMessage').textContent = 'Unable to load auction status';
+                }
+            } catch (error) {
+                console.error('❌ Failed to get auction status:', error);
+                document.getElementById('timerMessage').textContent = 'Error loading auction status';
+            }
+        }
+        
+        // Update timer display
+        function updateTimerDisplay(status) {
+            const timerDisplay = document.getElementById('timerDisplay');
+            const timerMessage = document.getElementById('timerMessage');
+            
+            if (status.isActive) {
+                timerDisplay.style.color = '#28a745';
+                timerMessage.textContent = `Auction ends at ${new Date(status.endTime).toLocaleTimeString()}`;
+            } else if (status.status === 'ended') {
+                timerDisplay.textContent = 'AUCTION ENDED';
+                timerDisplay.style.color = '#dc3545';
+                timerMessage.textContent = 'Bidding is now closed';
+                clearInterval(timerInterval);
+            } else {
+                timerDisplay.textContent = 'NOT STARTED';
+                timerDisplay.style.color = '#ffc107';
+                timerMessage.textContent = `Auction starts at ${new Date(status.startTime).toLocaleTimeString()}`;
+            }
+        }
+        
+        // Update countdown every second
+        function updateCountdown() {
+            if (!auctionEndTime) return;
+            
+            const now = new Date();
+            const timeRemaining = auctionEndTime.getTime() - now.getTime();
+            
+            if (timeRemaining <= 0) {
+                // Auction ended
+                document.getElementById('timerDisplay').textContent = 'AUCTION ENDED';
+                document.getElementById('timerDisplay').style.color = '#dc3545';
+                document.getElementById('timerMessage').textContent = 'Bidding is now closed';
+                clearInterval(timerInterval);
+                
+                // Disable all bid buttons
+                document.querySelectorAll('.bid-button').forEach(btn => {
+                    btn.disabled = true;
+                    btn.textContent = 'Auction Ended';
+                });
+                
+                // Hide subscribe button
+                document.getElementById('subscribeFloat').classList.add('hidden');
+                
+                return;
+            }
+            
+            // Calculate minutes and seconds
+            const minutes = Math.floor(timeRemaining / (1000 * 60));
+            const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+            
+            // Display countdown
+            document.getElementById('timerDisplay').textContent = 
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
         
         // Authenticate with Pi Network and check subscription
         async function authenticateAndCheckSubscription() {
@@ -454,6 +546,13 @@
         async function placeBid(itemId, itemNumber) {
             if (!piUser) {
                 alert('Please authenticate first');
+                return;
+            }
+            
+            // Check if auction is still active
+            const now = new Date();
+            if (auctionEndTime && now >= auctionEndTime) {
+                alert('Auction has ended. No more bids can be placed.');
                 return;
             }
             

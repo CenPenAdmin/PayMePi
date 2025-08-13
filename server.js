@@ -1696,11 +1696,16 @@ app.post('/close-auction', async (req, res) => {
 
 // Helper function to check auction timing
 async function getAuctionStatus() {
-    // For now, we'll use a simple time-based system
-    // You can modify these dates to control auction timing
-    const auctionStart = new Date('2025-08-12T00:00:00Z'); // Start date
-    const auctionEnd = new Date('2025-08-20T23:59:59Z');   // End date
+    // Current time: approximately 11:30 PM, auction started 6 minutes ago and ends in 4 minutes
     const now = new Date();
+    const auctionStart = new Date(now.getTime() - (6 * 60 * 1000)); // 6 minutes ago
+    const auctionEnd = new Date(now.getTime() + (4 * 60 * 1000)); // 4 minutes from now (ends at ~11:34)
+    
+    console.log(`🕐 Auction timing check:`);
+    console.log(`   Current time: ${now.toLocaleTimeString()}`);
+    console.log(`   Auction started: ${auctionStart.toLocaleTimeString()}`);
+    console.log(`   Auction ends: ${auctionEnd.toLocaleTimeString()}`);
+    console.log(`   Time remaining: ${Math.round((auctionEnd.getTime() - now.getTime()) / 1000)} seconds`);
     
     if (now < auctionStart) {
         return {
