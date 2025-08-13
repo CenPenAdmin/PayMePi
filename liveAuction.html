@@ -3,32 +3,530 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Auction</title>
+    <title>Live Auction - Appraisells</title>
+    
+    <!-- Configuration -->
+    <script src="config.js"></script>
+    
+    <!-- Pi SDK -->
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    
     <style>
         body {
             margin: 0;
             padding: 0;
-            background-color: #030006;
-            color: white;
+            background-color: white;
+            color: #030006;
             font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+            min-height: 100vh;
+        }
+        
+        header {
+            background-color: #030006;
+            padding: 20px 0;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 3.5em;
+            color: white;
             text-align: center;
         }
         
-        .coming-soon-text {
-            font-size: 2.5em;
+        .auction-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .auction-title {
+            text-align: center;
+            font-size: 2em;
+            margin: 30px 0;
+            color: #030006;
+        }
+        
+        .auction-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 20px 0;
+        }
+        
+        .auction-item {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            background: #f9f9f9;
+            text-align: center;
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .auction-item:hover {
+            box-shadow: 0 4px 15px rgba(3, 0, 6, 0.2);
+        }
+        
+        .artist-name {
+            font-size: 1.2em;
             font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+            color: #030006;
+            margin-bottom: 8px;
+        }
+        
+        .artwork-title {
+            font-size: 1.1em;
+            color: #666;
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+        
+        .reserve-bid {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #030006;
+            margin-bottom: 20px;
+        }
+        
+        .artwork-image {
+            width: 100%;
+            height: 240px;
+            background: #ddd;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 1em;
+        }
+        
+        .bid-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+        
+        .bid-input {
+            width: 80px;
+            padding: 8px;
+            font-size: 1.1em;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin: 0 10px;
+            text-align: center;
+        }
+        
+        .bid-button {
+            background: #030006;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        
+        .bid-button:hover {
+            background: #1a1a1a;
+        }
+        
+        .bid-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .bid-status {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .subscribe-float {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: #ff4444;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            border: none;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 68, 68, 0.4);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .subscribe-float:hover {
+            background: #ff6666;
+            transform: scale(1.1);
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .loading {
+            text-align: center;
+            font-size: 1.2em;
+            color: #666;
+            margin: 50px 0;
+        }
+        
+        .user-info {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
         }
     </style>
 </head>
 <body>
-    <div class="coming-soon-text">
-        Auction Coming Soon
+    <header>
+        <h1>APPRAISELLS</h1>
+    </header>
+    
+    <div class="auction-container">
+        <div class="auction-title">Live Art Auction</div>
+        
+        <div class="user-info">
+            <div id="userStatus">Loading user status...</div>
+        </div>
+        
+        <div class="loading" id="loadingMessage">Loading auction items...</div>
+        
+        <div class="auction-grid" id="auctionGrid" style="display: none;">
+            <!-- Auction Item 1 -->
+            <div class="auction-item" data-item-id="item1">
+                <div class="artist-name">Vincent van Gogh</div>
+                <div class="artwork-title">"Starry Night Study"</div>
+                <div class="reserve-bid">Minimum Reserve: 3 Pi</div>
+                <div class="artwork-image">
+                    [Artwork Image Coming Soon]
+                </div>
+                <div class="bid-section hidden" id="bidSection1">
+                    <div>Your Bid: 
+                        <input type="number" class="bid-input" id="bidInput1" min="3" step="0.1" placeholder="3.0">
+                        Pi
+                        <button class="bid-button" onclick="placeBid('item1', 1)">Place Bid</button>
+                    </div>
+                    <div class="bid-status" id="bidStatus1"></div>
+                </div>
+            </div>
+            
+            <!-- Auction Item 2 -->
+            <div class="auction-item" data-item-id="item2">
+                <div class="artist-name">Pablo Picasso</div>
+                <div class="artwork-title">"Abstract Portrait #47"</div>
+                <div class="reserve-bid">Minimum Reserve: 3 Pi</div>
+                <div class="artwork-image">
+                    [Artwork Image Coming Soon]
+                </div>
+                <div class="bid-section hidden" id="bidSection2">
+                    <div>Your Bid: 
+                        <input type="number" class="bid-input" id="bidInput2" min="3" step="0.1" placeholder="3.0">
+                        Pi
+                        <button class="bid-button" onclick="placeBid('item2', 2)">Place Bid</button>
+                    </div>
+                    <div class="bid-status" id="bidStatus2"></div>
+                </div>
+            </div>
+            
+            <!-- Auction Item 3 -->
+            <div class="auction-item" data-item-id="item3">
+                <div class="artist-name">Claude Monet</div>
+                <div class="artwork-title">"Water Lilies Reflection"</div>
+                <div class="reserve-bid">Minimum Reserve: 3 Pi</div>
+                <div class="artwork-image">
+                    [Artwork Image Coming Soon]
+                </div>
+                <div class="bid-section hidden" id="bidSection3">
+                    <div>Your Bid: 
+                        <input type="number" class="bid-input" id="bidInput3" min="3" step="0.1" placeholder="3.0">
+                        Pi
+                        <button class="bid-button" onclick="placeBid('item3', 3)">Place Bid</button>
+                    </div>
+                    <div class="bid-status" id="bidStatus3"></div>
+                </div>
+            </div>
+            
+            <!-- Auction Item 4 -->
+            <div class="auction-item" data-item-id="item4">
+                <div class="artist-name">Georgia O'Keeffe</div>
+                <div class="artwork-title">"Desert Bloom #12"</div>
+                <div class="reserve-bid">Minimum Reserve: 3 Pi</div>
+                <div class="artwork-image">
+                    [Artwork Image Coming Soon]
+                </div>
+                <div class="bid-section hidden" id="bidSection4">
+                    <div>Your Bid: 
+                        <input type="number" class="bid-input" id="bidInput4" min="3" step="0.1" placeholder="3.0">
+                        Pi
+                        <button class="bid-button" onclick="placeBid('item4', 4)">Place Bid</button>
+                    </div>
+                    <div class="bid-status" id="bidStatus4"></div>
+                </div>
+            </div>
+            
+            <!-- Auction Item 5 -->
+            <div class="auction-item" data-item-id="item5">
+                <div class="artist-name">Jackson Pollock</div>
+                <div class="artwork-title">"Rhythm in Blue"</div>
+                <div class="reserve-bid">Minimum Reserve: 3 Pi</div>
+                <div class="artwork-image">
+                    [Artwork Image Coming Soon]
+                </div>
+                <div class="bid-section hidden" id="bidSection5">
+                    <div>Your Bid: 
+                        <input type="number" class="bid-input" id="bidInput5" min="3" step="0.1" placeholder="3.0">
+                        Pi
+                        <button class="bid-button" onclick="placeBid('item5', 5)">Place Bid</button>
+                    </div>
+                    <div class="bid-status" id="bidStatus5"></div>
+                </div>
+            </div>
+        </div>
     </div>
+    
+    <!-- Floating Subscribe Button (shown only for non-subscribers) -->
+    <button class="subscribe-float hidden" id="subscribeFloat" onclick="goToSubscription()">
+        SUBSCRIBE TO BID ON ITEMS
+    </button>
+    
+    <script>
+        let piUser = null;
+        let userBids = {}; // Track user's bids per item
+        
+        // Initialize page
+        window.addEventListener('load', function() {
+            console.log('🔄 Live Auction page loaded');
+            authenticateAndCheckSubscription();
+        });
+        
+        // Authenticate with Pi Network and check subscription
+        async function authenticateAndCheckSubscription() {
+            try {
+                console.log('🔐 Starting Pi Network authentication...');
+                
+                // Check if Pi SDK is available
+                if (typeof Pi === 'undefined') {
+                    throw new Error('Pi SDK not loaded. Please open this app in Pi Browser.');
+                }
+                
+                // Initialize Pi SDK
+                Pi.init({
+                    version: "2.0",
+                    sandbox: true
+                });
+                
+                // Authenticate user
+                const auth = await Pi.authenticate(['username', 'payments']);
+                piUser = auth.user;
+                
+                console.log(`✅ Authenticated as: ${piUser.username}`);
+                
+                // Update user status
+                document.getElementById('userStatus').innerHTML = `
+                    <strong>Welcome, ${piUser.username}!</strong>
+                `;
+                
+                // Check subscription status
+                await checkSubscriptionAndShowUI();
+                
+            } catch (error) {
+                console.error('❌ Authentication failed:', error);
+                document.getElementById('userStatus').innerHTML = `
+                    <div style="color: red;">
+                        <strong>Authentication Required</strong><br>
+                        Please open this app in Pi Browser and allow authentication.
+                    </div>
+                `;
+                showSubscribeButton();
+            }
+        }
+        
+        // Check subscription status and show appropriate UI
+        async function checkSubscriptionAndShowUI() {
+            try {
+                const response = await fetch(`${CONFIG.BACKEND_URL}/subscription-status/${piUser.username}`, {
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success && result.subscribed) {
+                    console.log('✅ User has active subscription - showing bid sections');
+                    showBidSections();
+                    await loadUserBids();
+                } else {
+                    console.log('❌ User needs subscription - showing subscribe button');
+                    showSubscribeButton();
+                }
+                
+                // Show auction grid
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('auctionGrid').style.display = 'grid';
+                
+            } catch (error) {
+                console.error('❌ Failed to check subscription:', error);
+                showSubscribeButton();
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('auctionGrid').style.display = 'grid';
+            }
+        }
+        
+        // Show bid sections for subscribed users
+        function showBidSections() {
+            document.getElementById('subscribeFloat').classList.add('hidden');
+            
+            // Show all bid sections
+            for (let i = 1; i <= 5; i++) {
+                document.getElementById(`bidSection${i}`).classList.remove('hidden');
+            }
+        }
+        
+        // Show subscribe button for non-subscribers
+        function showSubscribeButton() {
+            document.getElementById('subscribeFloat').classList.remove('hidden');
+            
+            // Hide all bid sections
+            for (let i = 1; i <= 5; i++) {
+                document.getElementById(`bidSection${i}`).classList.add('hidden');
+            }
+        }
+        
+        // Load user's existing bids
+        async function loadUserBids() {
+            try {
+                const response = await fetch(`${CONFIG.BACKEND_URL}/auction-bids/${piUser.username}`, {
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (response.ok) {
+                    const bids = await response.json();
+                    
+                    // Update UI with existing bids
+                    bids.forEach(bid => {
+                        const itemNumber = bid.itemId.replace('item', '');
+                        userBids[bid.itemId] = bid.bidAmount;
+                        
+                        // Update input and show status
+                        document.getElementById(`bidInput${itemNumber}`).value = bid.bidAmount;
+                        document.getElementById(`bidInput${itemNumber}`).disabled = true;
+                        document.getElementById(`bidStatus${itemNumber}`).innerHTML = `
+                            <span style="color: green;">✅ Your bid: ${bid.bidAmount} Pi (submitted)</span>
+                        `;
+                        
+                        // Disable bid button
+                        const bidButton = document.querySelector(`#bidSection${itemNumber} .bid-button`);
+                        bidButton.disabled = true;
+                        bidButton.textContent = 'Bid Submitted';
+                    });
+                    
+                    console.log('📊 Loaded existing bids:', userBids);
+                }
+            } catch (error) {
+                console.error('❌ Failed to load existing bids:', error);
+            }
+        }
+        
+        // Place a bid on an item
+        async function placeBid(itemId, itemNumber) {
+            if (!piUser) {
+                alert('Please authenticate first');
+                return;
+            }
+            
+            // Check if user already bid on this item
+            if (userBids[itemId]) {
+                alert('You have already placed a bid on this item');
+                return;
+            }
+            
+            const bidInput = document.getElementById(`bidInput${itemNumber}`);
+            const bidAmount = parseFloat(bidInput.value);
+            
+            if (!bidAmount || bidAmount < 3) {
+                alert('Please enter a valid bid amount (minimum 3 Pi)');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${CONFIG.BACKEND_URL}/place-auction-bid`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        username: piUser.username,
+                        userUid: piUser.uid,
+                        itemId: itemId,
+                        bidAmount: bidAmount,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Mark bid as placed
+                    userBids[itemId] = bidAmount;
+                    
+                    // Update UI
+                    bidInput.disabled = true;
+                    document.getElementById(`bidStatus${itemNumber}`).innerHTML = `
+                        <span style="color: green;">✅ Your bid: ${bidAmount} Pi (submitted)</span>
+                    `;
+                    
+                    // Disable bid button
+                    const bidButton = document.querySelector(`#bidSection${itemNumber} .bid-button`);
+                    bidButton.disabled = true;
+                    bidButton.textContent = 'Bid Submitted';
+                    
+                    console.log(`✅ Bid placed successfully: ${bidAmount} Pi on ${itemId}`);
+                } else {
+                    alert('Failed to place bid: ' + result.error);
+                }
+                
+            } catch (error) {
+                console.error('❌ Failed to place bid:', error);
+                alert('Failed to place bid. Please try again.');
+            }
+        }
+        
+        // Go to subscription page
+        function goToSubscription() {
+            if (piUser) {
+                window.location.href = `auctionPayment.html?username=${encodeURIComponent(piUser.username)}`;
+            } else {
+                window.location.href = 'auctionPayment.html';
+            }
+        }
+    </script>
 </body>
 </html>
