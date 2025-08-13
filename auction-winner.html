@@ -430,10 +430,15 @@
                     ` : ''}
                     
                     ${win.paymentStatus === 'paid' ? `
+                        <button class="pay-button" onclick="accessDigitalArt('${win._id}', '${win.itemId}')" style="background: #28a745;">
+                            🎨 View Your Digital Artwork
+                        </button>
+                        
                         <div class="payment-info">
-                            <strong>Payment Completed:</strong> ${win.paidAt ? new Date(win.paidAt).toLocaleString() : 'Recently'}<br>
-                            <strong>Payment ID:</strong> ${win.paymentId}<br>
-                            <strong>Status:</strong> Artwork will be prepared for delivery/pickup.
+                            <strong>✅ Payment Completed:</strong> ${win.paidAt ? new Date(win.paidAt).toLocaleString() : 'Recently'}<br>
+                            <strong>💰 Amount Paid:</strong> ${win.winningBid} Pi<br>
+                            <strong>📄 Payment ID:</strong> ${win.paymentId}<br>
+                            <strong>🎨 Status:</strong> Digital artwork is ready for viewing and download!
                         </div>
                     ` : ''}
                     
@@ -537,61 +542,188 @@
             try {
                 console.log(`💰 Initiating payment for ${itemId}: ${amount} Pi`);
                 
-                // Create Pi payment
-                const payment = Pi.createPayment({
+                // Find the winner record to get winner ID
+                const winRecord = userWins.find(win => win.itemId === itemId);
+                
+                if (!winRecord) {
+                    throw new Error('Winner record not found');
+                }
+                
+                // Update UI to show processing
+                const paymentButton = document.querySelector(`[onclick*="'${itemId}'"]`);
+                const paymentStatus = document.getElementById(`paymentStatus-${itemId}`);
+                
+                if (paymentButton) {
+                    paymentButton.disabled = true;
+                    paymentButton.textContent = 'Processing...';
+                }
+                
+                if (paymentStatus) {
+                    paymentStatus.textContent = '⏳ Processing payment...';
+                    paymentStatus.className = 'payment-status payment-pending';
+                }
+                
+                // Create Pi payment with proper metadata
+                const payment = await Pi.createPayment({
                     amount: amount,
-                    memo: `Payment for auction item ${itemId}`,
-                    metadata: { auctionId, itemId }
+                    memo: `Payment for won auction item: ${itemId}`,
+                    metadata: { 
+                        type: 'auction_winner_payment',
+                        auctionId: auctionId, 
+                        itemId: itemId,
+                        winnerId: winRecord._id, // Include winner ID for backend processing
+                        winnerUsername: piUser.username
+                    }
+                }, {
+                    // Pi SDK callback handlers
+                    onReadyForServerApproval: function(paymentId) {
+                        console.log(`🔄 Payment ready for approval: ${paymentId}`);
+                        return approveAuctionPayment(paymentId, winRecord._id);
+                    },
+                    onReadyForServerCompletion: function(paymentId, txId) {
+                        console.log(`🔄 Payment ready for completion: ${paymentId}, TX: ${txId}`);
+                        return completeAuctionPayment(paymentId, txId, winRecord._id);
+                    },
+                    onCancel: function(paymentId) {
+                        console.log(`❌ Payment cancelled: ${paymentId}`);
+                        // Reset UI
+                        if (paymentButton) {
+                            paymentButton.disabled = false;
+                            paymentButton.textContent = `Pay ${amount} Pi Now`;
+                        }
+                        if (paymentStatus) {
+                            paymentStatus.textContent = '💳 Payment Required';
+                            paymentStatus.className = 'payment-status payment-pending';
+                        }
+                    },
+                    onError: function(error, payment) {
+                        console.error(`❌ Payment error:`, error);
+                        // Reset UI
+                        if (paymentButton) {
+                            paymentButton.disabled = false;
+                            paymentButton.textContent = `Pay ${amount} Pi Now`;
+                        }
+                        if (paymentStatus) {
+                            paymentStatus.textContent = '❌ Payment failed - try again';
+                            paymentStatus.className = 'payment-status payment-pending';
+                        }
+                        alert(`Payment failed: ${error.message || error}`);
+                    }
                 });
                 
-                const paymentId = await payment.submit();
-                console.log(`✅ Payment submitted: ${paymentId}`);
+                console.log(`✅ Payment created successfully`);
                 
-                // Process payment on backend
-                const response = await fetch(`${CONFIG.BACKEND_URL}/pay-auction-win`, {
+            } catch (error) {
+                console.error('❌ Payment creation failed:', error);
+                
+                // Reset UI on error
+                const paymentButton = document.querySelector(`[onclick*="'${itemId}'"]`);
+                const paymentStatus = document.getElementById(`paymentStatus-${itemId}`);
+                
+                if (paymentButton) {
+                    paymentButton.disabled = false;
+                    paymentButton.textContent = `Pay ${amount} Pi Now`;
+                }
+                if (paymentStatus) {
+                    paymentStatus.textContent = '💳 Payment Required';
+                    paymentStatus.className = 'payment-status payment-pending';
+                }
+                
+                alert(`Payment failed: ${error.message}`);
+            }
+        }
+        
+        // Approve auction payment (called by Pi SDK)
+        async function approveAuctionPayment(paymentId, winnerId) {
+            try {
+                console.log(`🔄 Approving auction payment: ${paymentId}`);
+                
+                const response = await fetch(`${CONFIG.BACKEND_URL}/approve-payment`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'ngrok-skip-browser-warning': 'true'
                     },
                     body: JSON.stringify({
-                        auctionId: auctionId,
-                        itemId: itemId,
-                        paymentId: paymentId
+                        paymentId: paymentId,
+                        winnerId: winnerId // Include winner ID for tracking
                     })
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    throw new Error(`Approval failed: HTTP ${response.status}`);
                 }
                 
                 const result = await response.json();
+                console.log(`✅ Payment approved:`, result);
+                return result;
                 
-                if (result.success) {
-                    console.log('✅ Payment processed successfully');
+            } catch (error) {
+                console.error('❌ Payment approval failed:', error);
+                throw error;
+            }
+        }
+        
+        // Complete auction payment (called by Pi SDK)
+        async function completeAuctionPayment(paymentId, txId, winnerId) {
+            try {
+                console.log(`🔄 Completing auction payment: ${paymentId}, TX: ${txId}`);
+                
+                const response = await fetch(`${CONFIG.BACKEND_URL}/complete-payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        paymentId: paymentId,
+                        txId: txId,
+                        winnerId: winnerId // Include winner ID for tracking
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Completion failed: HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                console.log(`✅ Payment completed:`, result);
+                
+                // Update UI to show success - find the payment status by matching the winner record
+                const winRecord = userWins.find(win => win._id === winnerId);
+                if (winRecord) {
+                    const paymentStatus = document.getElementById(`paymentStatus-${winRecord.itemId}`);
+                    const paymentButton = document.querySelector(`[onclick*="'${winRecord.itemId}'"]`);
                     
-                    // Update UI
-                    const paymentStatus = document.getElementById(`paymentStatus-${itemId}`);
-                    paymentStatus.textContent = '✅ Payment Completed';
-                    paymentStatus.className = 'payment-status payment-paid';
+                    if (paymentStatus) {
+                        paymentStatus.textContent = '✅ Payment Completed! Digital art ready.';
+                        paymentStatus.className = 'payment-status payment-paid';
+                    }
                     
-                    // Clear timer
+                    if (paymentButton) {
+                        paymentButton.style.display = 'none';
+                    }
+                }
+                
+                // Clear any running timers
+                Object.keys(paymentTimers).forEach(itemId => {
                     if (paymentTimers[itemId]) {
                         clearInterval(paymentTimers[itemId]);
                     }
-                    
-                    // Reload page to show updated status
-                    setTimeout(() => {
-                        location.reload();
-                    }, 2000);
-                    
-                } else {
-                    throw new Error(result.error || 'Payment processing failed');
-                }
+                });
+                
+                // Show success message and reload
+                alert('🎉 Payment completed successfully! Your digital artwork is now ready.');
+                
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+                
+                return result;
                 
             } catch (error) {
-                console.error('❌ Payment failed:', error);
-                alert(`Payment failed: ${error.message}`);
+                console.error('❌ Payment completion failed:', error);
+                throw error;
             }
         }
         
@@ -600,6 +732,78 @@
             const errorElement = document.getElementById('errorMessage');
             errorElement.textContent = message;
             errorElement.style.display = 'block';
+        }
+        
+        // Access digital artwork for paid items
+        async function accessDigitalArt(winnerId, itemId) {
+            try {
+                console.log(`🎨 Accessing digital art - Winner ID: ${winnerId}, Item: ${itemId}`);
+                
+                // Call backend to access digital art
+                const response = await fetch(`${CONFIG.BACKEND_URL}/access-digital-art`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        username: piUser.username,
+                        winnerId: winnerId,
+                        itemId: itemId
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Access failed: HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                console.log(`✅ Digital art access granted:`, result);
+                
+                if (result.success && result.digitalArt) {
+                    const art = result.digitalArt;
+                    
+                    // Show digital art in a modal/popup
+                    const artModal = `
+                        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; justify-content: center; align-items: center;" onclick="this.remove()">
+                            <div style="background: white; padding: 30px; border-radius: 15px; max-width: 600px; max-height: 80vh; overflow-y: auto;" onclick="event.stopPropagation()">
+                                <h2>🎨 Your Digital Artwork</h2>
+                                <h3>${art.title}</h3>
+                                <p><strong>Artist:</strong> ${art.artist}</p>
+                                <p><strong>Winning Bid:</strong> ${art.winningBid} Pi</p>
+                                <p><strong>Purchased:</strong> ${new Date(art.paidAt).toLocaleString()}</p>
+                                
+                                <div style="margin: 20px 0;">
+                                    <img src="${art.previewUrl}" alt="${art.title}" style="max-width: 100%; height: auto; border-radius: 8px;">
+                                </div>
+                                
+                                <p><strong>Description:</strong> ${art.description}</p>
+                                <p><strong>License:</strong> ${art.licenseType}</p>
+                                
+                                <div style="margin-top: 20px;">
+                                    <button onclick="window.open('${art.downloadUrl}', '_blank')" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin-right: 10px; cursor: pointer;">
+                                        📥 Download High-Res
+                                    </button>
+                                    <button onclick="window.open('${art.highResUrl}', '_blank')" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin-right: 10px; cursor: pointer;">
+                                        🖼️ View Full Size
+                                    </button>
+                                    <button onclick="this.closest('[style*=\"position: fixed\"]').remove()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                                        ✕ Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.body.insertAdjacentHTML('beforeend', artModal);
+                } else {
+                    alert('Unable to access digital artwork. Please try again.');
+                }
+                
+            } catch (error) {
+                console.error('❌ Digital art access failed:', error);
+                alert(`Access failed: ${error.message}`);
+            }
         }
     </script>
 </body>

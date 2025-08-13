@@ -638,6 +638,13 @@ app.post('/complete-payment', async (req, res) => {
                                                  data.memo?.includes('30-day') ||
                                                  data.memo?.includes('Appraisells');
 
+                    // Check if this is an auction winner payment
+                    const isAuctionPayment = data.metadata?.type === 'auction_winner_payment' ||
+                                           data.memo?.includes('auction item') ||
+                                           existingPayment?.paymentDetails?.memo?.includes('auction item');
+
+                    console.log(`🔍 Payment type detection - Subscription: ${isSubscriptionPayment}, Auction: ${isAuctionPayment}`);
+
                     // Update user profile with completed payment stats
                     if (username !== 'unknown') {
                         // Update user profile payment totals
@@ -664,8 +671,98 @@ app.post('/complete-payment', async (req, res) => {
                             ip: clientIP,
                             userAgent: req.get('user-agent'),
                             transactionLink: data.transaction?._link,
-                            isSubscription: isSubscriptionPayment
+                            isSubscription: isSubscriptionPayment,
+                            isAuction: isAuctionPayment
                         });
+
+                        // Handle auction winner payment completion
+                        if (isAuctionPayment) {
+                            console.log('🏆 Processing auction winner payment completion...');
+                            try {
+                                // Extract auction metadata from payment
+                                const auctionData = data.metadata || existingPayment?.paymentDetails?.metadata || {};
+                                const winnerId = auctionData.winnerId;
+                                const itemId = auctionData.itemId;
+                                const auctionId = auctionData.auctionId || 'auction_1';
+
+                                console.log(`🔍 Auction payment data - Winner ID: ${winnerId}, Item: ${itemId}, Auction: ${auctionId}`);
+
+                                if (winnerId) {
+                                    // Update auction winner record with payment completion
+                                    const { ObjectId } = require('mongodb');
+                                    const updateResult = await db.collection('auction_winners').updateOne(
+                                        { _id: new ObjectId(winnerId) },
+                                        {
+                                            $set: {
+                                                paymentStatus: 'paid',
+                                                paymentId: paymentId,
+                                                txId: txId,
+                                                paidAmount: amount,
+                                                paidAt: new Date(),
+                                                digitalArtStatus: 'ready_for_delivery', // Digital art is ready immediately
+                                                completionDetails: {
+                                                    transactionVerified: data.status?.transaction_verified,
+                                                    transactionLink: data.transaction?._link,
+                                                    fromAddress: data.from_address,
+                                                    toAddress: data.to_address
+                                                }
+                                            }
+                                        }
+                                    );
+
+                                    if (updateResult.modifiedCount > 0) {
+                                        console.log(`✅ Auction winner payment completed for ${username} - Item: ${itemId}`);
+                                        
+                                        // Log auction-specific activity
+                                        await logUserActivity(username, userUid, 'auction_payment_completed', {
+                                            winnerId: winnerId,
+                                            itemId: itemId,
+                                            auctionId: auctionId,
+                                            paidAmount: amount,
+                                            paymentId: paymentId,
+                                            txId: txId,
+                                            digitalArtReady: true
+                                        });
+
+                                        // Create digital art delivery record
+                                        await db.collection('digital_art_delivery').insertOne({
+                                            winnerId: new ObjectId(winnerId),
+                                            username: username,
+                                            userUid: userUid,
+                                            itemId: itemId,
+                                            auctionId: auctionId,
+                                            deliveryStatus: 'ready', // ready, delivered, accessed
+                                            paymentDetails: {
+                                                paymentId: paymentId,
+                                                txId: txId,
+                                                paidAmount: amount,
+                                                paidAt: new Date()
+                                            },
+                                            digitalAsset: {
+                                                // These will be populated based on itemId
+                                                title: getArtTitle(itemId),
+                                                artist: getArtArtist(itemId),
+                                                description: getArtDescription(itemId),
+                                                highResUrl: null, // To be set when digital files are uploaded
+                                                downloadUrl: null,
+                                                licenseType: 'personal_use' // or 'commercial_use' based on auction
+                                            },
+                                            createdAt: new Date(),
+                                            accessLog: []
+                                        });
+
+                                        console.log(`🎨 Digital art delivery record created for ${itemId}`);
+                                        
+                                    } else {
+                                        console.error(`⚠️ Failed to update auction winner record for winner ID: ${winnerId}`);
+                                    }
+                                } else {
+                                    console.error('⚠️ Auction payment detected but no winner ID found in metadata');
+                                }
+                            } catch (auctionError) {
+                                console.error('❌ Error processing auction payment completion:', auctionError);
+                            }
+                        }
 
                         // Create subscription if this is a subscription payment
                         if (isSubscriptionPayment) {
@@ -719,6 +816,150 @@ app.post('/complete-payment', async (req, res) => {
     } catch (error) {
         console.error('❌ Error completing payment:', error.message);
         res.status(500).json({ success: false, error: `Internal server error: ${error.message}` });
+    }
+});
+
+// Helper functions for auction art information
+function getArtTitle(itemId) {
+    const artInfo = {
+        'art_piece_1': 'Chomp Bomper One',
+        'art_piece_2': 'Chomp Bomper Two', 
+        'art_piece_3': 'Chomp Bomper Three',
+        'art_piece_4': 'Chomp Bomper Four',
+        'art_piece_5': 'Chomp Bomper Five'
+    };
+    return artInfo[itemId] || 'Unknown Artwork';
+}
+
+function getArtArtist(itemId) {
+    // All current items are by Hanoi Boi
+    return 'Hanoi Boi';
+}
+
+function getArtDescription(itemId) {
+    const descriptions = {
+        'art_piece_1': 'Original digital artwork "Chomp Bomper One" by Hanoi Boi',
+        'art_piece_2': 'Original digital artwork "Chomp Bomper Two" by Hanoi Boi',
+        'art_piece_3': 'Original digital artwork "Chomp Bomper Three" by Hanoi Boi', 
+        'art_piece_4': 'Original digital artwork "Chomp Bomper Four" by Hanoi Boi',
+        'art_piece_5': 'Original digital artwork "Chomp Bomper Five" by Hanoi Boi'
+    };
+    return descriptions[itemId] || 'Original digital artwork';
+}
+
+// Get user's digital art collection
+app.get('/user-digital-art/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        console.log(`🎨 Getting digital art collection for user: ${username}`);
+        
+        const artCollection = await db.collection('digital_art_delivery').find({ 
+            username: username 
+        }).sort({ createdAt: -1 }).toArray();
+        
+        console.log(`🔍 Found ${artCollection.length} digital art items for ${username}`);
+        
+        res.json({ 
+            success: true, 
+            username: username,
+            artCount: artCollection.length,
+            digitalArt: artCollection.map(art => ({
+                id: art._id,
+                itemId: art.itemId,
+                title: art.digitalAsset.title,
+                artist: art.digitalAsset.artist,
+                description: art.digitalAsset.description,
+                deliveryStatus: art.deliveryStatus,
+                paidAmount: art.paymentDetails.paidAmount,
+                paidAt: art.paymentDetails.paidAt,
+                auctionId: art.auctionId,
+                canDownload: art.deliveryStatus === 'ready' || art.deliveryStatus === 'delivered',
+                accessCount: art.accessLog.length
+            }))
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting user digital art:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Access digital art (mark as accessed and provide download info)
+app.post('/access-digital-art/:artId', async (req, res) => {
+    try {
+        const { artId } = req.params;
+        const { username } = req.body;
+        
+        console.log(`🎨 User ${username} accessing digital art: ${artId}`);
+        
+        const { ObjectId } = require('mongodb');
+        
+        // Find the art record
+        const artRecord = await db.collection('digital_art_delivery').findOne({
+            _id: new ObjectId(artId),
+            username: username
+        });
+        
+        if (!artRecord) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Digital art not found or not owned by user' 
+            });
+        }
+        
+        if (artRecord.deliveryStatus !== 'ready' && artRecord.deliveryStatus !== 'delivered') {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Digital art is not ready for access' 
+            });
+        }
+        
+        // Log the access
+        await db.collection('digital_art_delivery').updateOne(
+            { _id: new ObjectId(artId) },
+            { 
+                $push: {
+                    accessLog: {
+                        accessedAt: new Date(),
+                        ip: req.ip,
+                        userAgent: req.get('user-agent')
+                    }
+                },
+                $set: {
+                    deliveryStatus: 'delivered', // Mark as delivered on first access
+                    lastAccessed: new Date()
+                }
+            }
+        );
+        
+        // Log user activity
+        await logUserActivity(username, artRecord.userUid, 'digital_art_accessed', {
+            artId: artId,
+            itemId: artRecord.itemId,
+            title: artRecord.digitalAsset.title,
+            artist: artRecord.digitalAsset.artist
+        });
+        
+        console.log(`✅ Digital art access logged for ${username} - ${artRecord.digitalAsset.title}`);
+        
+        res.json({ 
+            success: true,
+            message: 'Digital art accessed successfully',
+            artInfo: {
+                title: artRecord.digitalAsset.title,
+                artist: artRecord.digitalAsset.artist,
+                description: artRecord.digitalAsset.description,
+                licenseType: artRecord.digitalAsset.licenseType,
+                // In a real implementation, these would be secure download URLs
+                downloadInstructions: `Your digital art "${artRecord.digitalAsset.title}" is ready! Please contact support for high-resolution file delivery.`,
+                deliveryNote: 'High-resolution files will be delivered via secure link within 24 hours of payment.'
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error accessing digital art:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -1950,6 +2191,148 @@ app.get('/debug/auction-data', async (req, res) => {
     }
 });
 
+// Get user's purchased digital art
+app.get('/my-digital-art/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        console.log(`🎨 Getting digital art for user: ${username}`);
+        
+        // Get all paid auction wins for this user
+        const winnersCollection = db.collection('auction_winners');
+        const paidWins = await winnersCollection.find({ 
+            winnerUsername: username,
+            paymentStatus: 'paid' 
+        }).toArray();
+        
+        console.log(`🔍 Found ${paidWins.length} paid wins for ${username}`);
+        
+        // Get digital art delivery records
+        const deliveryCollection = db.collection('digital_art_delivery');
+        const digitalArt = await Promise.all(paidWins.map(async (win) => {
+            const deliveryRecord = await deliveryCollection.findOne({ winnerId: win._id });
+            
+            return {
+                _id: win._id,
+                itemId: win.itemId,
+                auctionId: win.auctionId,
+                winningBid: win.winningBid,
+                paidAt: win.paidAt,
+                digitalAsset: {
+                    title: getArtTitle(win.itemId),
+                    artist: getArtArtist(win.itemId),
+                    description: getArtDescription(win.itemId),
+                    highResUrl: deliveryRecord?.digitalAsset?.highResUrl || '/placeholder-art.jpg',
+                    downloadUrl: deliveryRecord?.digitalAsset?.downloadUrl || null,
+                    licenseType: deliveryRecord?.digitalAsset?.licenseType || 'personal_use'
+                },
+                deliveryStatus: deliveryRecord?.deliveryStatus || 'ready',
+                accessCount: deliveryRecord?.accessLog?.length || 0,
+                lastAccessed: deliveryRecord?.accessLog?.slice(-1)[0]?.accessedAt || null
+            };
+        }));
+        
+        // Log access activity
+        await logUserActivity(username, null, 'digital_art_collection_viewed', {
+            totalPurchasedItems: digitalArt.length,
+            itemIds: digitalArt.map(art => art.itemId)
+        });
+        
+        res.json({ 
+            success: true, 
+            username: username,
+            digitalArt: digitalArt,
+            totalItems: digitalArt.length
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting user digital art:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Access/download specific digital art item
+app.post('/access-digital-art', async (req, res) => {
+    try {
+        const { username, winnerId, itemId } = req.body;
+        
+        if (!username || !winnerId || !itemId) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Missing required fields: username, winnerId, itemId' 
+            });
+        }
+        
+        console.log(`🎨 Digital art access request - User: ${username}, Item: ${itemId}`);
+        
+        // Verify user owns this digital art
+        const { ObjectId } = require('mongodb');
+        const winnersCollection = db.collection('auction_winners');
+        const winner = await winnersCollection.findOne({
+            _id: new ObjectId(winnerId),
+            winnerUsername: username,
+            paymentStatus: 'paid'
+        });
+        
+        if (!winner) {
+            return res.status(403).json({ 
+                success: false, 
+                error: 'Digital art not found or not purchased' 
+            });
+        }
+        
+        // Log access
+        const deliveryCollection = db.collection('digital_art_delivery');
+        await deliveryCollection.updateOne(
+            { winnerId: new ObjectId(winnerId) },
+            { 
+                $push: { 
+                    accessLog: {
+                        accessedAt: new Date(),
+                        userAgent: req.get('user-agent'),
+                        ip: req.ip
+                    }
+                },
+                $set: { 
+                    deliveryStatus: 'accessed',
+                    lastAccessed: new Date()
+                }
+            }
+        );
+        
+        // Log user activity
+        await logUserActivity(username, null, 'digital_art_accessed', {
+            itemId: itemId,
+            winnerId: winnerId,
+            artTitle: getArtTitle(itemId),
+            artArtist: getArtArtist(itemId)
+        });
+        
+        // Return digital art information
+        res.json({ 
+            success: true, 
+            digitalArt: {
+                title: getArtTitle(itemId),
+                artist: getArtArtist(itemId),
+                description: getArtDescription(itemId),
+                winningBid: winner.winningBid,
+                paidAt: winner.paidAt,
+                licenseType: 'personal_use',
+                // In a real implementation, these would be secure URLs to actual digital files
+                previewUrl: `/art-preview/${itemId}.jpg`,
+                downloadUrl: `/download-art/${winnerId}`, // Secure download link
+                highResUrl: `/art-highres/${itemId}.png`
+            },
+            accessGranted: true,
+            message: 'Digital art access granted'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error accessing digital art:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // =============================================================================
 // END AUCTION WINNER MANAGEMENT ENDPOINTS
 // =============================================================================
@@ -1959,11 +2342,11 @@ async function getAuctionStatus() {
     // Auction 1 - Fixed timestamps that don't change when users enter/leave
     const now = new Date();
     
-    // Set auction end time to 2:10 PM today
+    // Set auction end time to 2:45 PM today
     const auctionEnd = new Date();
-    auctionEnd.setHours(14, 10, 0, 0); // 2:10 PM today
+    auctionEnd.setHours(14, 45, 0, 0); // 2:45 PM today
 
-    // Set auction start time to 24 hours before end (started yesterday at 2:10 PM)
+    // Set auction start time to 24 hours before end (started yesterday at 2:45 PM)
     const auctionStart = new Date(auctionEnd.getTime() - (24 * 60 * 60 * 1000));
     
     const timeRemaining = auctionEnd.getTime() - now.getTime();
