@@ -1696,41 +1696,56 @@ app.post('/close-auction', async (req, res) => {
 
 // Helper function to check auction timing
 async function getAuctionStatus() {
-    // Current time: approximately 11:30 PM, auction started 6 minutes ago and ends in 4 minutes
+    // Auction 1 - Fixed timestamps that don't change when users enter/leave
     const now = new Date();
-    const auctionStart = new Date(now.getTime() - (6 * 60 * 1000)); // 6 minutes ago
-    const auctionEnd = new Date(now.getTime() + (4 * 60 * 1000)); // 4 minutes from now (ends at ~11:34)
     
-    console.log(`🕐 Auction timing check:`);
-    console.log(`   Current time: ${now.toLocaleTimeString()}`);
-    console.log(`   Auction started: ${auctionStart.toLocaleTimeString()}`);
-    console.log(`   Auction ends: ${auctionEnd.toLocaleTimeString()}`);
-    console.log(`   Time remaining: ${Math.round((auctionEnd.getTime() - now.getTime()) / 1000)} seconds`);
+    // Set auction end time to 11:00 AM today
+    const auctionEnd = new Date();
+    auctionEnd.setHours(11, 0, 0, 0); // 11:00 AM today
+    
+    // Set auction start time to 24 hours before end (started yesterday at 11 AM)
+    const auctionStart = new Date(auctionEnd.getTime() - (24 * 60 * 60 * 1000));
+    
+    const timeRemaining = auctionEnd.getTime() - now.getTime();
+    
+    console.log(`🕐 Auction 1 timing check:`);
+    console.log(`   Current time: ${now.toLocaleString()}`);
+    console.log(`   Auction started: ${auctionStart.toLocaleString()}`);
+    console.log(`   Auction ends: ${auctionEnd.toLocaleString()}`);
+    console.log(`   Time remaining: ${Math.round(timeRemaining / 1000)} seconds`);
     
     if (now < auctionStart) {
         return {
             isActive: false,
             status: 'not_started',
-            message: 'Auction has not started yet',
+            message: 'Auction 1 has not started yet',
+            auctionId: 'auction_1',
+            auctionName: 'Auction 1',
             startTime: auctionStart.toISOString(),
-            endTime: auctionEnd.toISOString()
+            endTime: auctionEnd.toISOString(),
+            timeRemaining: 0
         };
     } else if (now > auctionEnd) {
         return {
             isActive: false,
             status: 'ended',
-            message: 'Auction has ended',
+            message: 'Auction 1 has ended',
+            auctionId: 'auction_1',
+            auctionName: 'Auction 1',
             startTime: auctionStart.toISOString(),
-            endTime: auctionEnd.toISOString()
+            endTime: auctionEnd.toISOString(),
+            timeRemaining: 0
         };
     } else {
         return {
             isActive: true,
             status: 'active',
-            message: 'Auction is currently active',
+            message: 'Auction 1 is currently active',
+            auctionId: 'auction_1',
+            auctionName: 'Auction 1',
             startTime: auctionStart.toISOString(),
             endTime: auctionEnd.toISOString(),
-            timeRemaining: auctionEnd.getTime() - now.getTime()
+            timeRemaining: timeRemaining
         };
     }
 }

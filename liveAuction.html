@@ -203,7 +203,7 @@
         
         <!-- Auction Timer -->
         <div id="auctionTimer" style="text-align: center; margin: 20px 0; padding: 15px; background: #f8f9fa; border: 2px solid #030006; border-radius: 8px;">
-            <div style="font-size: 1.2em; font-weight: bold; color: #030006;">Auction Status</div>
+            <div style="font-size: 1.2em; font-weight: bold; color: #030006;">Auction 1 Status</div>
             <div id="timerDisplay" style="font-size: 1.5em; font-weight: bold; color: #ff4444; margin: 10px 0;">Loading...</div>
             <div id="timerMessage" style="font-size: 1em; color: #666;">Checking auction status...</div>
         </div>
@@ -315,7 +315,7 @@
     <script>
         let piUser = null;
         let userBids = {}; // Track user's bids per item
-        let auctionEndTime = null;
+        let serverAuctionEndTime = null; // Server's fixed end time
         let timerInterval = null;
         
         // Initialize page
@@ -325,7 +325,7 @@
             authenticateAndCheckSubscription();
         });
         
-        // Start auction timer
+        // Start auction timer using server's fixed timestamp
         async function startAuctionTimer() {
             try {
                 const response = await fetch(`${CONFIG.BACKEND_URL}/auction-status`, {
@@ -334,14 +334,15 @@
                 
                 if (response.ok) {
                     const status = await response.json();
-                    auctionEndTime = new Date(status.endTime);
+                    serverAuctionEndTime = new Date(status.endTime);
                     
-                    console.log('🕐 Auction status:', status);
-                    console.log('🕐 Auction ends at:', auctionEndTime.toLocaleTimeString());
+                    console.log('🕐 Auction 1 status from server:', status);
+                    console.log('🕐 Server says auction ends at:', serverAuctionEndTime.toLocaleString());
                     
                     updateTimerDisplay(status);
                     
-                    // Start countdown timer
+                    // Start countdown timer that updates every second
+                    if (timerInterval) clearInterval(timerInterval);
                     timerInterval = setInterval(updateCountdown, 1000);
                 } else {
                     document.getElementById('timerMessage').textContent = 'Unable to load auction status';
@@ -352,59 +353,70 @@
             }
         }
         
-        // Update timer display
+        // Update timer display based on server status
         function updateTimerDisplay(status) {
             const timerDisplay = document.getElementById('timerDisplay');
             const timerMessage = document.getElementById('timerMessage');
             
             if (status.isActive) {
                 timerDisplay.style.color = '#28a745';
-                timerMessage.textContent = `Auction ends at ${new Date(status.endTime).toLocaleTimeString()}`;
+                timerMessage.textContent = `${status.auctionName} ends at ${new Date(status.endTime).toLocaleString()}`;
             } else if (status.status === 'ended') {
-                timerDisplay.textContent = 'AUCTION ENDED';
+                timerDisplay.textContent = 'AUCTION 1 ENDED';
                 timerDisplay.style.color = '#dc3545';
                 timerMessage.textContent = 'Bidding is now closed';
                 clearInterval(timerInterval);
+                disableAllBidding();
             } else {
                 timerDisplay.textContent = 'NOT STARTED';
                 timerDisplay.style.color = '#ffc107';
-                timerMessage.textContent = `Auction starts at ${new Date(status.startTime).toLocaleTimeString()}`;
+                timerMessage.textContent = `${status.auctionName} starts at ${new Date(status.startTime).toLocaleString()}`;
             }
         }
         
-        // Update countdown every second
+        // Update countdown using server's fixed end time
         function updateCountdown() {
-            if (!auctionEndTime) return;
+            if (!serverAuctionEndTime) return;
             
             const now = new Date();
-            const timeRemaining = auctionEndTime.getTime() - now.getTime();
+            const timeRemaining = serverAuctionEndTime.getTime() - now.getTime();
             
             if (timeRemaining <= 0) {
                 // Auction ended
-                document.getElementById('timerDisplay').textContent = 'AUCTION ENDED';
+                document.getElementById('timerDisplay').textContent = 'AUCTION 1 ENDED';
                 document.getElementById('timerDisplay').style.color = '#dc3545';
                 document.getElementById('timerMessage').textContent = 'Bidding is now closed';
                 clearInterval(timerInterval);
-                
-                // Disable all bid buttons
-                document.querySelectorAll('.bid-button').forEach(btn => {
-                    btn.disabled = true;
-                    btn.textContent = 'Auction Ended';
-                });
-                
-                // Hide subscribe button
-                document.getElementById('subscribeFloat').classList.add('hidden');
-                
+                disableAllBidding();
                 return;
             }
             
-            // Calculate minutes and seconds
-            const minutes = Math.floor(timeRemaining / (1000 * 60));
+            // Calculate time remaining
+            const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
+            const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
             
             // Display countdown
-            document.getElementById('timerDisplay').textContent = 
-                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            let displayTime = '';
+            if (hours > 0) {
+                displayTime = `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            } else {
+                displayTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            document.getElementById('timerDisplay').textContent = displayTime;
+        }
+        
+        // Disable all bidding when auction ends
+        function disableAllBidding() {
+            // Disable all bid buttons
+            document.querySelectorAll('.bid-button').forEach(btn => {
+                btn.disabled = true;
+                btn.textContent = 'Auction Ended';
+            });
+            
+            // Hide subscribe button
+            document.getElementById('subscribeFloat').classList.add('hidden');
         }
         
         // Authenticate with Pi Network and check subscription
