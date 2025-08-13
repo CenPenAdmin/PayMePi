@@ -2431,15 +2431,22 @@ async function getAuctionStatus() {
     
     // 🎯 AUCTION TIMING CONFIGURATION - UPDATE THESE LINES FOR TESTING
     // ================================================================
-    // Set auction end time to TODAY at 4:55 PM
+    
+    // OPTION 1: Fixed time today
     const auctionEnd = new Date();
-    auctionEnd.setDate(auctionEnd.getDate()); // Today (change to +1 for tomorrow, +2 for day after, etc.)
-    auctionEnd.setHours(16, 55, 0, 0); // 4:55 PM (change hours: 16=4PM, 17=5PM, etc. minutes: 55, 0, 30, etc.)
+    auctionEnd.setDate(auctionEnd.getDate()); // Today
+    auctionEnd.setHours(17, 0, 0, 0); // 5:00 PM (17:00)
+    
+    // OPTION 2: Dynamic time (uncomment to use - ends 1 hour from now)
+    // const auctionEnd = new Date(Date.now() + (60 * 60 * 1000)); // 1 hour from now
+    
+    // OPTION 3: Dynamic time (uncomment to use - ends 30 minutes from now)
+    // const auctionEnd = new Date(Date.now() + (30 * 60 * 1000)); // 30 minutes from now
     
     // FUTURE TESTING EXAMPLES:
     // Tomorrow at 5:30 PM: auctionEnd.setDate(auctionEnd.getDate() + 1); auctionEnd.setHours(17, 30, 0, 0);
     // Today at 6:00 PM: auctionEnd.setDate(auctionEnd.getDate()); auctionEnd.setHours(18, 0, 0, 0);
-    // Next week same time: auctionEnd.setDate(auctionEnd.getDate() + 7); auctionEnd.setHours(16, 55, 0, 0);
+    // Next week same time: auctionEnd.setDate(auctionEnd.getDate() + 7); auctionEnd.setHours(17, 0, 0, 0);
     // ================================================================
 
     // Set auction start time to 24 hours before end
