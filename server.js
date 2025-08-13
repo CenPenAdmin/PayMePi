@@ -632,19 +632,20 @@ app.post('/complete-payment', async (req, res) => {
                     const userUid = existingPayment?.userInfo?.userUid;
                     const amount = data.amount || existingPayment?.paymentDetails?.amount || 0;
 
-                    // Check if this is a subscription payment
-                    const isSubscriptionPayment = data.metadata?.paymentType === 'monthly_subscription' || 
-                                                 data.memo?.includes('subscription') ||
-                                                 existingPayment?.paymentDetails?.memo?.includes('subscription') ||
-                                                 data.memo?.includes('30-day') ||
-                                                 data.memo?.includes('Appraisells');
-
-                    // Check if this is an auction winner payment
+                    // Check if this is an auction winner payment (check this first)
                     const isAuctionPayment = data.metadata?.type === 'auction_winner_payment' ||
                                            data.memo?.includes('auction item') ||
                                            data.memo?.includes('won auction item') ||
                                            existingPayment?.paymentDetails?.memo?.includes('auction item') ||
                                            existingPayment?.paymentDetails?.metadata?.type === 'auction_winner_payment';
+
+                    // Check if this is a subscription payment
+                    const isSubscriptionPayment = data.metadata?.paymentType === 'monthly_subscription' || 
+                                                 data.memo?.includes('subscription') ||
+                                                 existingPayment?.paymentDetails?.memo?.includes('subscription') ||
+                                                 data.memo?.includes('30-day') ||
+                                                 data.memo?.includes('Appraisells') ||
+                                                 (amount === 1 && !isAuctionPayment); // 1 Pi payments are subscription payments unless they're auction payments
 
                     console.log(`🔍 Payment type detection - Subscription: ${isSubscriptionPayment}, Auction: ${isAuctionPayment}`);
                     console.log(`🔍 DEBUG - Payment metadata:`, data.metadata);
@@ -2412,11 +2413,11 @@ async function getAuctionStatus() {
     // Auction 1 - Fixed timestamps that don't change when users enter/leave
     const now = new Date();
     
-    // Set auction end time to 3:35 PM today
+    // Set auction end time to 3:50 PM today
     const auctionEnd = new Date();
-    auctionEnd.setHours(15, 35, 0, 0); // 3:35 PM today
+    auctionEnd.setHours(15, 50, 0, 0); // 3:50 PM today
 
-    // Set auction start time to 24 hours before end (started yesterday at 3:35 PM)
+    // Set auction start time to 24 hours before end (started yesterday at 3:50 PM)
     const auctionStart = new Date(auctionEnd.getTime() - (24 * 60 * 60 * 1000));
     
     const timeRemaining = auctionEnd.getTime() - now.getTime();
@@ -2556,6 +2557,49 @@ app.get('/simple-test', (req, res) => {
         message: 'Simple test successful - no CORS restrictions',
         timestamp: new Date().toISOString()
     });
+});
+
+// Debug endpoint to test user data
+app.get('/debug/user/:username', async (req, res) => {
+    if (!db) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Database not connected' 
+        });
+    }
+
+    try {
+        const { username } = req.params;
+        
+        // Get all user-related data
+        const profile = await db.collection('user_profiles').findOne({ username });
+        const subscription = await db.collection('user_subscriptions').findOne({ username });
+        const activities = await db.collection('user_activities').find({ username }).sort({ timestamp: -1 }).limit(10).toArray();
+        const payments = await db.collection('payments').find({ 'userInfo.username': username }).sort({ timestamp: -1 }).limit(5).toArray();
+        
+        // Check subscription status
+        const subscriptionStatus = await verifyActiveSubscription(username);
+        
+        res.json({
+            success: true,
+            debug: {
+                username,
+                profile: profile,
+                subscription: subscription,
+                subscriptionStatus: subscriptionStatus,
+                recentActivities: activities,
+                recentPayments: payments,
+                timestamp: new Date()
+            }
+        });
+    } catch (error) {
+        console.error('❌ Debug endpoint error:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Debug check failed',
+            details: error.message
+        });
+    }
 });
 
 // Start server

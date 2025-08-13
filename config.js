@@ -1,7 +1,7 @@
 // Configuration for Pi Payment App
 const CONFIG = {
     // Backend API URL - Update this with your actual backend URL
-    BACKEND_URL: 'https://e2b3fe8c3116.ngrok-free.app', // Your current ngrok URL
+    BACKEND_URL: 'http://localhost:3000', // Local development
 
     // Pi SDK Configuration
     PI_SDK: {
