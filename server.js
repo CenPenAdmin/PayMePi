@@ -26,7 +26,7 @@ app.use(cors({
         const allowedOrigins = [
             'http://localhost:3000',
             'https://CenPenAdmin.github.io',
-            'https://e0d2f85551ac.ngrok-free.app'
+            'https://1464a71951c0.ngrok-free.app'
         ];
         
         const allowedPatterns = [
@@ -2435,7 +2435,7 @@ async function getAuctionStatus() {
     // OPTION 1: Fixed time today
     const auctionEnd = new Date();
     auctionEnd.setDate(auctionEnd.getDate()); // Today
-    auctionEnd.setHours(23, 24, 0, 0); // 11:24 PM (23:24)
+    auctionEnd.setHours(10, 25, 0, 0); // 10:25 AM (10:25)
 
     // OPTION 2: Dynamic time (uncomment to use - ends 1 hour from now)
     // const auctionEnd = new Date(Date.now() + (60 * 60 * 1000)); // 1 hour from now
@@ -2561,7 +2561,7 @@ app.get('/health', (req, res) => {
             allowedOrigins: [
                 'http://localhost:3000',
                 'https://CenPenAdmin.github.io',
-                'https://e0d2f85551ac.ngrok-free.app'
+                'https://1464a71951c0.ngrok-free.app'
             ]
         }
     });
@@ -2647,7 +2647,7 @@ app.get('/debug/system-status', async (req, res) => {
             server: {
                 running: true,
                 port: PORT,
-                ngrokUrl: 'https://e0d2f85551ac.ngrok-free.app',
+                ngrokUrl: 'https://1464a71951c0.ngrok-free.app',
                 piApiKey: !!PI_API_KEY
             },
             database: {
@@ -2884,13 +2884,13 @@ app.get('/debug/ping', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Access your app locally at: http://localhost:${PORT}`);
-    console.log(`Access your app via ngrok at: https://e0d2f85551ac.ngrok-free.app`);
+    console.log(`Access your app via ngrok at: https://1464a71951c0.ngrok-free.app`);
     console.log(`\n🔧 DEBUG ENDPOINTS:`);
-    console.log(`- System Status: https://e0d2f85551ac.ngrok-free.app/debug/system-status`);
-    console.log(`- Test Ping: https://e0d2f85551ac.ngrok-free.app/debug/ping`);
-    console.log(`- Test Subscription: POST https://e0d2f85551ac.ngrok-free.app/debug/test-subscription`);
-    console.log(`- Test Bidding: POST https://e0d2f85551ac.ngrok-free.app/debug/test-bidding`);
-    console.log(`- Test Payment: POST https://e0d2f85551ac.ngrok-free.app/debug/test-payment-completion`);
+    console.log(`- System Status: https://1464a71951c0.ngrok-free.app/debug/system-status`);
+    console.log(`- Test Ping: https://1464a71951c0.ngrok-free.app/debug/ping`);
+    console.log(`- Test Subscription: POST https://1464a71951c0.ngrok-free.app/debug/test-subscription`);
+    console.log(`- Test Bidding: POST https://1464a71951c0.ngrok-free.app/debug/test-bidding`);
+    console.log(`- Test Payment: POST https://1464a71951c0.ngrok-free.app/debug/test-payment-completion`);
     console.log('\nIMPORTANT: Remember to:');
     console.log('1. Get your Pi API key from Pi Developer Portal');
     console.log('2. Set your PI_API_KEY environment variable');
