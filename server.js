@@ -2647,7 +2647,7 @@ app.get('/debug/system-status', async (req, res) => {
             server: {
                 running: true,
                 port: PORT,
-                ngrokUrl: 'https://1464a71951c0.ngrok-free.app',
+                ngrokUrl: 'https://9faae0f045fd.ngrok-free.app',
                 piApiKey: !!PI_API_KEY
             },
             database: {
