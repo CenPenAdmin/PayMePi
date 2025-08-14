@@ -26,7 +26,7 @@ app.use(cors({
         const allowedOrigins = [
             'http://localhost:3000',
             'https://CenPenAdmin.github.io',
-            'https://1464a71951c0.ngrok-free.app'
+            'https://9faae0f045fd.ngrok-free.app'
         ];
         
         const allowedPatterns = [
@@ -2561,7 +2561,7 @@ app.get('/health', (req, res) => {
             allowedOrigins: [
                 'http://localhost:3000',
                 'https://CenPenAdmin.github.io',
-                'https://1464a71951c0.ngrok-free.app'
+                'https://9faae0f045fd.ngrok-free.app'
             ]
         }
     });
@@ -2884,13 +2884,13 @@ app.get('/debug/ping', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Access your app locally at: http://localhost:${PORT}`);
-    console.log(`Access your app via ngrok at: https://1464a71951c0.ngrok-free.app`);
+    console.log(`Access your app via ngrok at: https://9faae0f045fd.ngrok-free.app`);
     console.log(`\n🔧 DEBUG ENDPOINTS:`);
-    console.log(`- System Status: https://1464a71951c0.ngrok-free.app/debug/system-status`);
-    console.log(`- Test Ping: https://1464a71951c0.ngrok-free.app/debug/ping`);
-    console.log(`- Test Subscription: POST https://1464a71951c0.ngrok-free.app/debug/test-subscription`);
-    console.log(`- Test Bidding: POST https://1464a71951c0.ngrok-free.app/debug/test-bidding`);
-    console.log(`- Test Payment: POST https://1464a71951c0.ngrok-free.app/debug/test-payment-completion`);
+    console.log(`- System Status: https://9faae0f045fd.ngrok-free.app/debug/system-status`);
+    console.log(`- Test Ping: https://9faae0f045fd.ngrok-free.app/debug/ping`);
+    console.log(`- Test Subscription: POST https://9faae0f045fd.ngrok-free.app/debug/test-subscription`);
+    console.log(`- Test Bidding: POST https://9faae0f045fd.ngrok-free.app/debug/test-bidding`);
+    console.log(`- Test Payment: POST https://9faae0f045fd.ngrok-free.app/debug/test-payment-completion`);
     console.log('\nIMPORTANT: Remember to:');
     console.log('1. Get your Pi API key from Pi Developer Portal');
     console.log('2. Set your PI_API_KEY environment variable');
