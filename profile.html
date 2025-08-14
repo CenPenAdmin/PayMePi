@@ -65,8 +65,30 @@
     <span style="font-size:1.5em; color: white; margin-bottom:16px;">Auction 1 Date and Time</span>
     <img src="images/auction-kurt-cobain-item1.jpg" alt="Appraisal" style="height:240px; width:240px; object-fit:cover; border:1px solid #fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.10);">
   </div>
+
+  <!-- User Collection Navigation Section -->
+  <div id="userCollectionSection" style="display: none; margin-top: 40px; padding: 20px; text-align: center;">
+    <h2 style="color: #030006; margin-bottom: 20px; font-size: 2em;">My Collection</h2>
+    
+    <div style="display: flex; flex-direction: column; gap: 15px; max-width: 400px; margin: 0 auto;">
+      <!-- Digital Art Collection -->
+      <button onclick="goToDigitalArt()" style="padding: 15px 20px; font-size: 1.2em; background-color: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;">
+        🎨 My Digital Art Collection
+      </button>
+      
+      <!-- Auction Winners -->
+      <button onclick="goToAuctionWinners()" style="padding: 15px 20px; font-size: 1.2em; background-color: #2196F3; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;">
+        🏆 My Auction Wins
+      </button>
+    </div>
+    
+    <!-- Collection Stats -->
+    <div id="collectionStats" style="margin-top: 25px; padding: 15px; background-color: #f5f5f5; border-radius: 8px; font-size: 1em; color: #666;">
+      <div id="statsContent">Loading collection stats...</div>
+    </div>
+  </div>
   
-  <div style="text-align: center; margin-top: 100px;">
+  <div style="text-align: center; margin-top: 40px;">
     <button onclick="logout()" id="logoutBtn" style="padding:12px 25px; font-size:2rem; background-color:#030006; color: white; border:none; border-radius:8px; cursor:pointer;">Log Out</button>
   </div>
 
@@ -158,6 +180,85 @@
       window.location.href = "index.html";
     }
 
+    // Navigation functions for user collection
+    function goToDigitalArt() {
+      if (!piUser) {
+        alert('Please authenticate first');
+        return;
+      }
+      addDebugInfo(`🎨 Navigating to digital art collection for: ${piUser.username}`);
+      window.location.href = `my-digital-art.html?username=${encodeURIComponent(piUser.username)}`;
+    }
+
+    function goToAuctionWinners() {
+      if (!piUser) {
+        alert('Please authenticate first');
+        return;
+      }
+      addDebugInfo(`🏆 Navigating to auction winners for: ${piUser.username}`);
+      window.location.href = `auction-winner.html?username=${encodeURIComponent(piUser.username)}`;
+    }
+
+    // Load collection stats
+    async function loadCollectionStats(username) {
+      try {
+        addDebugInfo(`📊 Loading collection stats for: ${username}`);
+        
+        // Fetch digital art collection
+        const artResponse = await fetch(`${CONFIG.BACKEND_URL}/user-digital-art/${username}`, {
+          headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        
+        // Fetch auction wins
+        const winsResponse = await fetch(`${CONFIG.BACKEND_URL}/user-wins/${username}`, {
+          headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        
+        let artCount = 0;
+        let winsCount = 0;
+        let pendingCount = 0;
+        
+        if (artResponse.ok) {
+          const artData = await artResponse.json();
+          artCount = artData.success ? artData.artworks.length : 0;
+        }
+        
+        if (winsResponse.ok) {
+          const winsData = await winsResponse.json();
+          if (winsData.success) {
+            winsCount = winsData.wins.length;
+            // Count pending items (not completed)
+            pendingCount = winsData.wins.filter(win => !win.completed).length;
+          }
+        }
+        
+        // Update stats display
+        const statsContent = document.getElementById('statsContent');
+        statsContent.innerHTML = `
+          <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px;">
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; font-weight: bold; color: #4CAF50;">${artCount}</div>
+              <div style="font-size: 0.9em;">Digital Artworks</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; font-weight: bold; color: #2196F3;">${winsCount}</div>
+              <div style="font-size: 0.9em;">Total Wins</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; font-weight: bold; color: #FF9800;">${pendingCount}</div>
+              <div style="font-size: 0.9em;">Pending Items</div>
+            </div>
+          </div>
+        `;
+        
+        addDebugInfo(`📊 Collection stats loaded: ${artCount} artworks, ${winsCount} wins, ${pendingCount} pending`);
+        
+      } catch (error) {
+        addDebugInfo(`❌ Failed to load collection stats: ${error.message}`);
+        document.getElementById('statsContent').innerHTML = 'Failed to load stats';
+      }
+    }
+
     function displayWalletInfo(wallet) {
       // Display wallet information if available
       const walletElement = document.getElementById("walletInfo");
@@ -234,6 +335,10 @@
         
         // Check subscription status for authenticated user and update UI accordingly
         await checkSubscriptionStatusAndUpdateUI(piUser.username);
+        
+        // Show collection section and load stats
+        document.getElementById('userCollectionSection').style.display = 'block';
+        await loadCollectionStats(piUser.username);
         
       } catch (error) {
         addDebugInfo(`❌ Pi Network authentication failed: ${error.message}`);

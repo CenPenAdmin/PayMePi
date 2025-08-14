@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Digital Art Collection - Appraisells</title>
+    
+    <!-- Configuration -->
+    <script src="config.js"></script>
+    
+    <!-- Pi SDK -->
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: white;
+            color: #030006;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+        }
+        
+        header {
+            background-color: #030006;
+            padding: 20px 0;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 3.5em;
+            color: white;
+            text-align: center;
+        }
+        
+        .collection-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .collection-title {
+            text-align: center;
+            font-size: 2.5em;
+            margin: 30px 0;
+            color: #030006;
+        }
+        
+        .user-info {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+        }
+        
+        .navigation {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .nav-button {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1em;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 0 10px;
+        }
+        
+        .nav-button:hover {
+            background: #5a6268;
+        }
+        
+        .collection-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #030006;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 1.1em;
+            color: #666;
+        }
+        
+        .art-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+        
+        .art-item {
+            border: 2px solid #28a745;
+            border-radius: 15px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f8fff8, #e8ffe8);
+            text-align: center;
+            position: relative;
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.2);
+        }
+        
+        .art-badge {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #28a745;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .artwork-info {
+            margin: 20px 0;
+        }
+        
+        .artist-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #030006;
+            margin-bottom: 8px;
+        }
+        
+        .artwork-title {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+        
+        .purchase-info {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .purchase-date {
+            font-size: 0.95em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .purchase-price {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #28a745;
+            margin: 5px 0;
+        }
+        
+        .view-button {
+            background: #030006;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px 0;
+            width: 100%;
+            transition: background 0.3s ease;
+        }
+        
+        .view-button:hover {
+            background: #1a1a1a;
+        }
+        
+        .access-count {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            font-size: 1.2em;
+            color: #666;
+            margin: 50px 0;
+        }
+        
+        .no-art {
+            text-align: center;
+            padding: 60px 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border: 2px dashed #ccc;
+        }
+        
+        .no-art h3 {
+            font-size: 1.5em;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .no-art p {
+            font-size: 1.1em;
+            color: #888;
+            margin-bottom: 20px;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .art-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        
+        .art-modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 2em;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .modal-actions {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .modal-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            margin: 0 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        
+        .modal-button.download {
+            background: #28a745;
+        }
+        
+        .modal-button.close {
+            background: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>APPRAISELLS</h1>
+    </header>
+    
+    <div class="collection-container">
+        <div class="collection-title">🎨 My Digital Art Collection</div>
+        
+        <div class="user-info">
+            <div id="userStatus">Loading user status...</div>
+        </div>
+        
+        <div class="navigation">
+            <a href="profile.html" class="nav-button">← Back to Profile</a>
+            <a href="auction-winner.html" class="nav-button">🏆 Auction Winners</a>
+            <a href="liveAuction.html" class="nav-button">🔴 Live Auction</a>
+        </div>
+        
+        <div class="loading" id="loadingMessage">Loading your digital art collection...</div>
+        
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        
+        <div id="collectionStats" class="collection-stats" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-number" id="totalArtCount">0</div>
+                <div class="stat-label">Artworks Owned</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalSpent">0</div>
+                <div class="stat-label">Pi Spent</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalViews">0</div>
+                <div class="stat-label">Total Views</div>
+            </div>
+        </div>
+        
+        <div class="art-grid" id="artGrid" style="display: none;">
+            <!-- Digital art items will be loaded here -->
+        </div>
+        
+        <div id="noArtSection" class="no-art" style="display: none;">
+            <h3>No Digital Art Yet</h3>
+            <p>You haven't purchased any digital artwork yet.</p>
+            <p>Win auctions to add beautiful digital art to your collection!</p>
+            <a href="liveAuction.html" class="nav-button">🎯 Join Live Auction</a>
+        </div>
+    </div>
+    
+    <script>
+        let piUser = null;
+        let digitalArtCollection = [];
+        
+        // Initialize page
+        window.addEventListener('load', function() {
+            console.log('🎨 Digital Art Collection page loaded');
+            authenticateAndLoadCollection();
+        });
+        
+        // Authenticate with Pi Network and load collection
+        async function authenticateAndLoadCollection() {
+            try {
+                console.log('🔐 Starting Pi Network authentication...');
+                
+                // Check if Pi SDK is available
+                if (typeof Pi === 'undefined') {
+                    throw new Error('Pi SDK not loaded. Please open this app in Pi Browser.');
+                }
+                
+                // Initialize Pi SDK
+                Pi.init({
+                    version: "2.0",
+                    sandbox: true
+                });
+                
+                // Authenticate user
+                const auth = await Pi.authenticate(['username', 'payments']);
+                piUser = auth.user;
+                
+                console.log(`✅ Authenticated as: ${piUser.username}`);
+                
+                // Update user status
+                document.getElementById('userStatus').innerHTML = `
+                    <strong>Welcome, ${piUser.username}!</strong><br>
+                    <span style="font-size: 0.9em; color: #666;">Your personal digital art collection</span>
+                `;
+                
+                // Load user's digital art collection
+                await loadDigitalArtCollection();
+                
+            } catch (error) {
+                console.error('❌ Authentication failed:', error);
+                showError('Authentication required. Please open this app in Pi Browser and allow authentication.');
+            }
+        }
+        
+        // Load user's digital art collection
+        async function loadDigitalArtCollection() {
+            try {
+                console.log(`🔄 Loading digital art collection for user: ${piUser.username}`);
+                
+                const response = await fetch(`${CONFIG.BACKEND_URL}/user-digital-art/${piUser.username}`, {
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    digitalArtCollection = result.digitalArt;
+                    console.log(`🎨 Found ${digitalArtCollection.length} digital art items for ${piUser.username}`);
+                    
+                    displayCollection();
+                } else {
+                    throw new Error(result.error || 'Failed to load collection');
+                }
+                
+            } catch (error) {
+                console.error('❌ Failed to load digital art collection:', error);
+                showError('Failed to load your digital art collection. Please try again.');
+            } finally {
+                document.getElementById('loadingMessage').style.display = 'none';
+            }
+        }
+        
+        // Display the digital art collection
+        function displayCollection() {
+            if (digitalArtCollection.length === 0) {
+                document.getElementById('noArtSection').style.display = 'block';
+                return;
+            }
+            
+            // Calculate and display stats
+            displayCollectionStats();
+            
+            // Create art items
+            const artGrid = document.getElementById('artGrid');
+            artGrid.innerHTML = '';
+            
+            digitalArtCollection.forEach((art, index) => {
+                const artElement = createArtElement(art, index + 1);
+                artGrid.appendChild(artElement);
+            });
+            
+            artGrid.style.display = 'grid';
+        }
+        
+        // Display collection statistics
+        function displayCollectionStats() {
+            const totalArt = digitalArtCollection.length;
+            const totalSpent = digitalArtCollection.reduce((sum, art) => sum + (art.paymentDetails?.paidAmount || 0), 0);
+            const totalViews = digitalArtCollection.reduce((sum, art) => sum + (art.accessLog?.length || 0), 0);
+            
+            document.getElementById('totalArtCount').textContent = totalArt;
+            document.getElementById('totalSpent').textContent = `${totalSpent} Pi`;
+            document.getElementById('totalViews').textContent = totalViews;
+            
+            document.getElementById('collectionStats').style.display = 'grid';
+        }
+        
+        // Create individual art element
+        function createArtElement(art, itemNumber) {
+            const div = document.createElement('div');
+            div.className = 'art-item';
+            div.id = `art-${art._id}`;
+            
+            const badgeText = art.deliveryStatus === 'ready' ? 'OWNED' : 'PROCESSING';
+            const badgeColor = art.deliveryStatus === 'ready' ? '#28a745' : '#ffc107';
+            
+            div.innerHTML = `
+                <div class="art-badge" style="background: ${badgeColor};">${badgeText}</div>
+                
+                <div class="artwork-info">
+                    <div class="artist-name">${art.digitalAsset?.artist || 'Hanoi Boi'}</div>
+                    <div class="artwork-title">"${art.digitalAsset?.title || 'Digital Artwork'}"</div>
+                </div>
+                
+                <div class="purchase-info">
+                    <div class="purchase-date">Purchased: ${new Date(art.paymentDetails?.paidAt || art.createdAt).toLocaleDateString()}</div>
+                    <div class="purchase-price">${art.paymentDetails?.paidAmount || 0} Pi</div>
+                </div>
+                
+                ${art.deliveryStatus === 'ready' ? `
+                    <button class="view-button" onclick="viewArtwork('${art._id}', '${art.itemId}')">
+                        🎨 View Artwork
+                    </button>
+                    
+                    <div class="access-count">
+                        Viewed ${art.accessLog?.length || 0} time${(art.accessLog?.length || 0) !== 1 ? 's' : ''}
+                    </div>
+                ` : `
+                    <div style="color: #666; font-style: italic; margin: 15px 0;">
+                        🔄 Processing... Available soon!
+                    </div>
+                `}
+            `;
+            
+            return div;
+        }
+        
+        // View individual artwork
+        async function viewArtwork(artId, itemId) {
+            try {
+                console.log(`🎨 Viewing artwork - ID: ${artId}, Item: ${itemId}`);
+                
+                // Call backend to access digital art and log the view
+                const response = await fetch(`${CONFIG.BACKEND_URL}/access-digital-art/${artId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        username: piUser.username
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Access failed: HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                console.log(`✅ Digital art accessed:`, result);
+                
+                if (result.success && result.artInfo) {
+                    // Show artwork in modal
+                    showArtworkModal(result.artInfo);
+                    
+                    // Update local access count
+                    const artItem = digitalArtCollection.find(art => art._id === artId);
+                    if (artItem) {
+                        if (!artItem.accessLog) artItem.accessLog = [];
+                        artItem.accessLog.push({ timestamp: new Date(), username: piUser.username });
+                        
+                        // Update the display
+                        const accessCountElement = document.querySelector(`#art-${artId} .access-count`);
+                        if (accessCountElement) {
+                            accessCountElement.textContent = `Viewed ${artItem.accessLog.length} time${artItem.accessLog.length !== 1 ? 's' : ''}`;
+                        }
+                    }
+                    
+                } else {
+                    throw new Error('Unable to access artwork details');
+                }
+                
+            } catch (error) {
+                console.error('❌ Failed to view artwork:', error);
+                alert(`Failed to view artwork: ${error.message}`);
+            }
+        }
+        
+        // Show artwork in modal
+        function showArtworkModal(artInfo) {
+            const modal = document.createElement('div');
+            modal.className = 'art-modal';
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            };
+            
+            modal.innerHTML = `
+                <div class="art-modal-content" onclick="event.stopPropagation()">
+                    <button class="modal-close" onclick="this.closest('.art-modal').remove()">&times;</button>
+                    
+                    <h2>🎨 ${artInfo.title}</h2>
+                    <h3>by ${artInfo.artist}</h3>
+                    
+                    <div style="margin: 20px 0;">
+                        <img src="images/auction-kurt-cobain-item1.jpg" alt="${artInfo.title}" 
+                             style="max-width: 100%; height: auto; border-radius: 8px; border: 2px solid #ddd;">
+                    </div>
+                    
+                    <p><strong>Description:</strong> ${artInfo.description}</p>
+                    
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                        <p><strong>Purchase Date:</strong> ${new Date(artInfo.purchaseDate).toLocaleString()}</p>
+                        <p><strong>Purchase Price:</strong> ${artInfo.purchasePrice} Pi</p>
+                        <p><strong>License Type:</strong> ${artInfo.licenseType || 'Personal Use'}</p>
+                        <p><strong>Total Views:</strong> ${artInfo.accessCount}</p>
+                    </div>
+                    
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #28a745;">
+                        <strong>🎉 Congratulations!</strong><br>
+                        You own this digital artwork! High-resolution files are available for download.
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button class="modal-button download" onclick="downloadArtwork('${artInfo.title}')">
+                            📥 Download High-Res
+                        </button>
+                        <button class="modal-button" onclick="shareArtwork('${artInfo.title}', '${artInfo.artist}')">
+                            📤 Share
+                        </button>
+                        <button class="modal-button close" onclick="this.closest('.art-modal').remove()">
+                            ✕ Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+        
+        // Download artwork (placeholder - would connect to actual download service)
+        function downloadArtwork(title) {
+            // In a real implementation, this would trigger an actual download
+            alert(`🔄 Initiating download for "${title}"...\n\nHigh-resolution files will be available shortly. Check your downloads folder!`);
+        }
+        
+        // Share artwork (placeholder - would connect to social sharing)
+        function shareArtwork(title, artist) {
+            const shareText = `Check out my digital art: "${title}" by ${artist} - collected on Appraisells! 🎨`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: `Digital Art: ${title}`,
+                    text: shareText,
+                    url: window.location.href
+                });
+            } else {
+                // Fallback: copy to clipboard
+                navigator.clipboard.writeText(shareText).then(() => {
+                    alert('📋 Share text copied to clipboard!');
+                }).catch(() => {
+                    alert(`📤 Share this:\n\n${shareText}`);
+                });
+            }
+        }
+        
+        // Show error message
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

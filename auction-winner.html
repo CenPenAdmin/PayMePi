@@ -277,7 +277,7 @@
         
         <div id="noWinsSection" class="no-wins" style="display: none;">
             <h3>No Auction Wins</h3>
-            <p>You haven't won any auction items yet.</p>
+            <p id="noWinsMessage">You haven't won any auction items yet.</p>
             <p>Keep bidding in future auctions for a chance to win amazing artwork!</p>
             <a href="liveAuction.html" class="back-button">Back to Live Auction</a>
         </div>
@@ -371,21 +371,29 @@
         
         // Display user's wins
         function displayWins() {
-            if (userWins.length === 0) {
+            // Filter out completed items
+            const activeWins = userWins.filter(win => !win.completed);
+            
+            console.log(`🔍 Total wins: ${userWins.length}, Active (not completed): ${activeWins.length}`);
+            
+            if (activeWins.length === 0) {
                 document.getElementById('noWinsSection').style.display = 'block';
+                document.getElementById('noWinsMessage').innerHTML = userWins.length > 0 
+                    ? 'All your auction wins have been completed! Visit your <a href="my-digital-art.html" style="color: #030006; text-decoration: underline;">Digital Art Collection</a> to view your items.'
+                    : 'You haven\'t won any auctions yet. Keep bidding!';
                 return;
             }
             
             // Show congratulations
             document.getElementById('congratulationsSection').style.display = 'block';
             document.getElementById('congratsMessage').textContent = 
-                `You won ${userWins.length} auction item${userWins.length > 1 ? 's' : ''}!`;
+                `You won ${activeWins.length} auction item${activeWins.length > 1 ? 's' : ''}!`;
             
-            // Create win items
+            // Create win items for active wins only
             const winsGrid = document.getElementById('winsGrid');
             winsGrid.innerHTML = '';
             
-            userWins.forEach((win, index) => {
+            activeWins.forEach((win, index) => {
                 const winElement = createWinElement(win, index + 1);
                 winsGrid.appendChild(winElement);
                 
@@ -784,7 +792,7 @@
                     
                     // Show digital art in a modal/popup
                     const artModal = `
-                        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; justify-content: center; align-items: center;" onclick="this.remove()">
+                        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; justify-content: center; align-items: center;" onclick="this.remove(); markAuctionCompleted('${winnerId}', '${itemId}')">
                             <div style="background: white; padding: 30px; border-radius: 15px; max-width: 600px; max-height: 80vh; overflow-y: auto;" onclick="event.stopPropagation()">
                                 <h2>🎨 Your Digital Artwork</h2>
                                 <h3>${art.title}</h3>
@@ -806,9 +814,13 @@
                                     <button onclick="window.open('${art.highResUrl}', '_blank')" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin-right: 10px; cursor: pointer;">
                                         🖼️ View Full Size
                                     </button>
-                                    <button onclick="this.closest('[style*=\"position: fixed\"]').remove()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                                    <button onclick="this.closest('[style*=\"position: fixed\"]').remove(); markAuctionCompleted('${winnerId}', '${itemId}')" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
                                         ✕ Close
                                     </button>
+                                </div>
+                                
+                                <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #6c757d;">
+                                    💡 <strong>Note:</strong> After viewing this artwork, it will be moved to your permanent collection and no longer appear in your pending wins.
                                 </div>
                             </div>
                         </div>
@@ -822,6 +834,66 @@
             } catch (error) {
                 console.error('❌ Digital art access failed:', error);
                 alert(`Access failed: ${error.message}`);
+            }
+        }
+        
+        // Mark auction as completed after user views digital art
+        async function markAuctionCompleted(winnerId, itemId) {
+            try {
+                console.log(`🏁 Marking auction as completed - Winner ID: ${winnerId}, Item: ${itemId}`);
+                
+                const response = await fetch(`${CONFIG.BACKEND_URL}/mark-auction-completed`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        username: piUser.username,
+                        auctionId: itemId,
+                        winId: winnerId
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log(`✅ Auction marked as completed:`, result);
+                    
+                    // Remove the win item from the display
+                    const winElement = document.getElementById(`win-${itemId}`);
+                    if (winElement) {
+                        winElement.style.transition = 'opacity 0.5s ease-out';
+                        winElement.style.opacity = '0';
+                        setTimeout(() => {
+                            winElement.remove();
+                            
+                            // Check if there are any remaining wins
+                            const remainingWins = document.querySelectorAll('.win-item');
+                            if (remainingWins.length === 0) {
+                                // Show message about visiting collection
+                                document.getElementById('noWinsSection').style.display = 'block';
+                                document.getElementById('noWinsMessage').innerHTML = 
+                                    'All your auction wins have been completed! Visit your <a href="my-digital-art.html" style="color: #030006; text-decoration: underline;">Digital Art Collection</a> to view your items.';
+                                document.getElementById('congratulationsSection').style.display = 'none';
+                                document.getElementById('winsGrid').style.display = 'none';
+                            }
+                        }, 500);
+                    }
+                    
+                    // Update the userWins array to mark this win as completed
+                    const winIndex = userWins.findIndex(win => win._id === winnerId || win.itemId === itemId);
+                    if (winIndex !== -1) {
+                        userWins[winIndex].completed = true;
+                        userWins[winIndex].completedAt = new Date();
+                    }
+                    
+                } else {
+                    console.warn(`⚠️ Failed to mark auction as completed: HTTP ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.error('❌ Failed to mark auction as completed:', error);
+                // Don't show error to user as this is a background operation
             }
         }
     </script>

@@ -1049,6 +1049,67 @@ app.post('/access-digital-art/:artId', async (req, res) => {
     }
 });
 
+// Mark auction as completed (when user views digital art after winning)
+app.post('/mark-auction-completed', async (req, res) => {
+    try {
+        const { username, auctionId, winId } = req.body;
+        
+        console.log(`🏁 Marking auction as completed for user ${username}, auction: ${auctionId}, win: ${winId}`);
+        
+        if (!username || !auctionId) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Username and auctionId are required' 
+            });
+        }
+        
+        const { ObjectId } = require('mongodb');
+        
+        // Update the auction winner record to mark it as completed
+        const updateFilter = { username: username, auctionId: auctionId };
+        if (winId) {
+            updateFilter._id = new ObjectId(winId);
+        }
+        
+        const updateResult = await db.collection('auction_winners').updateOne(
+            updateFilter,
+            { 
+                $set: {
+                    completed: true,
+                    completedAt: new Date(),
+                    completedBy: username
+                }
+            }
+        );
+        
+        if (updateResult.matchedCount === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Auction win record not found' 
+            });
+        }
+        
+        // Log the completion activity
+        await logUserActivity(username, null, 'auction_completed', {
+            auctionId: auctionId,
+            winId: winId,
+            completedAt: new Date()
+        });
+        
+        console.log(`✅ Auction ${auctionId} marked as completed for ${username}`);
+        
+        res.json({ 
+            success: true,
+            message: 'Auction marked as completed successfully',
+            completedAt: new Date()
+        });
+        
+    } catch (error) {
+        console.error('❌ Error marking auction as completed:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // User authentication tracking endpoint
 app.post('/log-auth', async (req, res) => {
     const { username, userUid, authSuccess } = req.body;
