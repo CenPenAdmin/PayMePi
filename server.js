@@ -632,13 +632,18 @@ app.post('/complete-payment', async (req, res) => {
                                    (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
                                    req.ip;
 
-                    // Get user info - try multiple sources
+                    // Get user info - try multiple sources with priority for auction payments
                     const existingPayment = await db.collection('payments').findOne({ paymentId });
-                    let username = data.user?.username || 
+                    
+                    // For auction payments, prioritize the metadata from the frontend
+                    let username = data.metadata?.winnerUsername || // Frontend passes this for auction payments
+                                  data.user?.username || 
                                   data.metadata?.username || 
                                   existingPayment?.userInfo?.username || 
                                   existingPayment?.metadata?.username ||
+                                  existingPayment?.metadata?.winnerUsername || // Check existing payment metadata too
                                   'unknown';
+                    
                     let userUid = data.user?.uid || 
                                  data.metadata?.userUid ||
                                  existingPayment?.userInfo?.userUid ||
@@ -647,6 +652,8 @@ app.post('/complete-payment', async (req, res) => {
                     const amount = data.amount || existingPayment?.paymentDetails?.amount || 1;
                     
                     console.log(`🔍 DEBUG - Extracted user info: username=${username}, userUid=${userUid}, amount=${amount}`);
+                    console.log(`🔍 DEBUG - Payment metadata:`, data.metadata);
+                    console.log(`🔍 DEBUG - Existing payment metadata:`, existingPayment?.metadata);
 
                     // Check if this is an auction winner payment (check this first)
                     const isAuctionPayment = data.metadata?.type === 'auction_winner_payment' ||
@@ -701,6 +708,7 @@ app.post('/complete-payment', async (req, res) => {
                         // Handle auction winner payment completion
                         if (isAuctionPayment) {
                             console.log('🏆 Processing auction winner payment completion...');
+                            console.log(`🔍 Username for auction payment: ${username}`);
                             try {
                                 // Extract auction metadata from payment - check multiple sources
                                 const auctionData = data.metadata || 
@@ -711,34 +719,50 @@ app.post('/complete-payment', async (req, res) => {
                                 let itemId = auctionData.itemId;
                                 const auctionId = auctionData.auctionId || 'auction_1';
 
-                                // If metadata is missing, try to extract from memo
-                                if (!winnerId && data.memo) {
+                                console.log(`🔍 Metadata extracted - Winner ID: ${winnerId}, Item: ${itemId}, Username: ${username}`);
+
+                                // If we don't have itemId from metadata, try to extract from memo
+                                if (!itemId && data.memo) {
                                     const memoMatch = data.memo.match(/won auction item: (\w+)/);
                                     if (memoMatch) {
                                         itemId = memoMatch[1];
-                                        
-                                        // Find the winner record by itemId and username
-                                        const winnersCollection = db.collection('auction_winners');
-                                        const winnerRecord = await winnersCollection.findOne({
+                                        console.log(`🔍 DEBUG - ItemId extracted from memo: ${itemId}`);
+                                    }
+                                }
+
+                                // If we still don't have winnerId but have username and itemId, find the winner record
+                                if (!winnerId && username !== 'unknown' && itemId) {
+                                    console.log(`🔍 DEBUG - Looking up winner record by username and itemId`);
+                                    const winnerRecord = await db.collection('auction_winners').findOne({
+                                        winnerUsername: username,
+                                        itemId: itemId,
+                                        paymentStatus: 'pending'
+                                    });
+                                    
+                                    if (winnerRecord) {
+                                        winnerId = winnerRecord._id.toString();
+                                        console.log(`🔍 DEBUG - Found winner record: ${winnerId}`);
+                                    } else {
+                                        console.log(`🔍 DEBUG - No pending winner record found for ${username}, ${itemId}`);
+                                        // Try without pending status in case it was already marked as paid
+                                        const anyWinnerRecord = await db.collection('auction_winners').findOne({
                                             winnerUsername: username,
-                                            itemId: itemId,
-                                            paymentStatus: 'pending'
+                                            itemId: itemId
                                         });
-                                        
-                                        if (winnerRecord) {
-                                            winnerId = winnerRecord._id.toString();
-                                            console.log(`🔍 DEBUG - Found winner record via memo: ${winnerId} for ${itemId}`);
+                                        if (anyWinnerRecord) {
+                                            winnerId = anyWinnerRecord._id.toString();
+                                            console.log(`🔍 DEBUG - Found winner record (any status): ${winnerId}, current status: ${anyWinnerRecord.paymentStatus}`);
                                         }
                                     }
                                 }
 
-                                console.log(`🔍 Auction payment data - Winner ID: ${winnerId}, Item: ${itemId}, Auction: ${auctionId}`);
+                                console.log(`🔍 Final auction payment data - Winner ID: ${winnerId}, Item: ${itemId}, Username: ${username}`);
 
-                                if (winnerId) {
+                                if (winnerId && username !== 'unknown') {
                                     // Update auction winner record with payment completion
                                     const { ObjectId } = require('mongodb');
                                     
-                                    console.log(`🔍 DEBUG - Attempting to update winner record with ID: ${winnerId}`);
+                                    console.log(`🔍 DEBUG - Attempting to update winner record with ID: ${winnerId} for user: ${username}`);
                                     
                                     const updateResult = await db.collection('auction_winners').updateOne(
                                         { _id: new ObjectId(winnerId) },
@@ -749,12 +773,13 @@ app.post('/complete-payment', async (req, res) => {
                                                 txId: txId,
                                                 paidAmount: amount,
                                                 paidAt: new Date(),
-                                                digitalArtStatus: 'ready_for_delivery', // Digital art is ready immediately
+                                                digitalArtStatus: 'ready_for_delivery',
                                                 completionDetails: {
                                                     transactionVerified: data.status?.transaction_verified,
                                                     transactionLink: data.transaction?._link,
                                                     fromAddress: data.from_address,
-                                                    toAddress: data.to_address
+                                                    toAddress: data.to_address,
+                                                    completedByUsername: username // Add this for verification
                                                 }
                                             }
                                         }
@@ -827,6 +852,7 @@ app.post('/complete-payment', async (req, res) => {
                         }
                     }
 
+                    // Update the payment record with completion details and correct username
                     await db.collection('payments').updateOne(
                         { paymentId },
                         { 
@@ -834,6 +860,10 @@ app.post('/complete-payment', async (req, res) => {
                                 status: 'completed', 
                                 txId, 
                                 completedAt: new Date(),
+                                
+                                // Ensure username is correctly stored
+                                username: username, // Explicitly set the username
+                                userUid: userUid,
                                 
                                 // Enhanced completion data
                                 completionDetails: {
@@ -844,7 +874,10 @@ app.post('/complete-payment', async (req, res) => {
                                     transactionLink: data.transaction?._link,
                                     finalAmount: data.amount,
                                     completionIP: clientIP,
-                                    completionUserAgent: req.get('user-agent')
+                                    completionUserAgent: req.get('user-agent'),
+                                    extractedUsername: username, // For debugging
+                                    isAuctionPayment: isAuctionPayment,
+                                    isSubscriptionPayment: isSubscriptionPayment
                                 },
                                 
                                 completionData: data
@@ -854,6 +887,7 @@ app.post('/complete-payment', async (req, res) => {
                     console.log('💾 Enhanced payment completion saved to database');
                     console.log(`🔗 Transaction: ${txId} verified: ${data.status?.transaction_verified}`);
                     console.log(`📋 Profile updated with completed payment for user: ${username}`);
+                    console.log(`🔍 DEBUG - Payment record updated with username: ${username}`);
                 } catch (dbError) {
                     console.error('⚠️  Database update failed:', dbError.message);
                 }
@@ -2631,6 +2665,53 @@ app.get('/debug/user/:username', async (req, res) => {
             error: 'Debug check failed',
             details: error.message
         });
+    }
+});
+
+// Debug endpoint to check payment records
+app.get('/debug/check-payments/:username?', async (req, res) => {
+    try {
+        const { username } = req.params;
+        console.log(`🔍 DEBUG - Checking payment records for: ${username || 'all users'}`);
+        
+        let query = {};
+        if (username) {
+            query = { 
+                $or: [
+                    { username: username },
+                    { 'userInfo.username': username },
+                    { 'completionDetails.extractedUsername': username }
+                ]
+            };
+        }
+        
+        const payments = await db.collection('payments').find(query)
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .toArray();
+        
+        const paymentSummary = payments.map(payment => ({
+            paymentId: payment.paymentId,
+            status: payment.status,
+            username: payment.username || payment.userInfo?.username || 'unknown',
+            amount: payment.amount || payment.completionDetails?.finalAmount || 'unknown',
+            memo: payment.memo,
+            type: payment.completionDetails?.isAuctionPayment ? 'auction' : 
+                  payment.completionDetails?.isSubscriptionPayment ? 'subscription' : 'unknown',
+            createdAt: payment.createdAt,
+            completedAt: payment.completedAt
+        }));
+        
+        res.json({
+            success: true,
+            username: username || 'all',
+            paymentCount: payments.length,
+            payments: paymentSummary
+        });
+        
+    } catch (error) {
+        console.error('❌ DEBUG - Payment check error:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
