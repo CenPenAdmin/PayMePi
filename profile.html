@@ -97,18 +97,28 @@
   <div id="userInfo" style="margin: 30px 0; font-size: 1.2em;"></div>
   <div id="walletInfo" style="margin: 10px 0; font-size: 1.1em;"></div>
 
-
+  <!-- User Collection Navigation Section -->
+  <div id="userCollectionSection" style="display: none; margin-top: 40px; padding: 20px; text-align: center;">
+    <h2 style="color: #030006; margin-bottom: 20px; font-size: 2em;">My Collection</h2>
     
+    <!-- Navigation Buttons -->
     <div style="display: flex; flex-direction: column; gap: 15px; max-width: 400px; margin: 0 auto;">
-      <!-- Digital Art Collection -->
-      <button onclick="goToDigitalArt()" style="padding: 15px 20px; font-size: 1.2em; background-color: #030003; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;">
-        🎨 My Digital Art Collection
+      <button onclick="goToDigitalArt()" style="padding: 15px 20px; font-size: 1.2em; background-color: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;">
+        🎨 View My Digital Art Collection
       </button>
       
-      <!-- Auction Winners -->
-      <button onclick="goToAuctionWinners()" style="padding: 15px 20px; font-size: 1.2em; background-color: #030006; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;">
-        🏆 My Auction Wins
+      <button onclick="goToAuctionWinners()" style="padding: 15px 20px; font-size: 1.2em; background-color: #2196F3; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;">
+        🏆 View My Auction Wins
       </button>
+    </div>
+  </div>
+
+   <!-- Collection Stats -->
+    <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+      <h3 style="color: #030006; margin-bottom: 15px; font-size: 1.3em;">Collection Overview</h3>
+      <div id="statsContent">
+        Loading collection stats...
+      </div>
     </div>
 
   <!-- Subscription Status Text (hidden by default) -->
