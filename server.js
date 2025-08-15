@@ -1162,6 +1162,56 @@ app.post('/mark-auction-completed', async (req, res) => {
     }
 });
 
+// Mark user wins as viewed (when user visits auction-winner page)
+app.post('/mark-wins-viewed', async (req, res) => {
+    try {
+        const { username } = req.body;
+        
+        console.log(`👁️ Marking wins as viewed for user: ${username}`);
+        
+        if (!username) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Username is required' 
+            });
+        }
+        
+        // Update all pending auction winner records to mark them as "viewed"
+        const updateResult = await db.collection('auction_winners').updateMany(
+            { 
+                winnerUsername: username,
+                paymentStatus: 'pending',
+                viewed: { $ne: true }  // Only update if not already viewed
+            },
+            { 
+                $set: {
+                    viewed: true,
+                    viewedAt: new Date()
+                }
+            }
+        );
+        
+        // Log the activity
+        await logUserActivity(username, null, 'wins_viewed', {
+            viewedCount: updateResult.modifiedCount,
+            viewedAt: new Date()
+        });
+        
+        console.log(`✅ Marked ${updateResult.modifiedCount} wins as viewed for ${username}`);
+        
+        res.json({ 
+            success: true,
+            message: 'Wins marked as viewed successfully',
+            viewedCount: updateResult.modifiedCount,
+            viewedAt: new Date()
+        });
+        
+    } catch (error) {
+        console.error('❌ Error marking wins as viewed:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // User authentication tracking endpoint
 app.post('/log-auth', async (req, res) => {
     const { username, userUid, authSuccess } = req.body;

@@ -321,6 +321,9 @@
                     <strong>Welcome, ${piUser.username}!</strong>
                 `;
                 
+                // Mark wins as viewed since user is visiting the auction winner page
+                await markWinsAsViewed();
+                
                 // Load user's wins
                 await loadUserWins();
                 
@@ -366,6 +369,33 @@
                 showError('Failed to load your auction wins. Please try again.');
             } finally {
                 document.getElementById('loadingMessage').style.display = 'none';
+            }
+        }
+        
+        // Mark wins as viewed (called when user visits auction winner page)
+        async function markWinsAsViewed() {
+            try {
+                console.log(`👁️ Marking wins as viewed for user: ${piUser.username}`);
+                
+                const response = await fetch(`${CONFIG.BACKEND_URL}/mark-wins-viewed`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({ username: piUser.username })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log(`✅ Marked ${result.viewedCount} wins as viewed`);
+                } else {
+                    console.warn(`⚠️ Failed to mark wins as viewed: ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error marking wins as viewed:', error);
+                // Don't block the page if this fails
             }
         }
         

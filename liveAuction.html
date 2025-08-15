@@ -264,18 +264,6 @@
             <div id="timerMessage" style="font-size: 1em; color: #666;">Checking auction status...</div>
         </div>
         
-        <!-- Winner Notification Banner (hidden by default) -->
-        <div id="winnerBanner" class="winner-notification" style="display: none;">
-            <div class="winner-content">
-                <h2>🎉 CONGRATULATIONS! YOU WON!</h2>
-                <p id="winnerMessage">You have won auction items that require payment!</p>
-                <button class="winner-button" onclick="goToWinnerPage()">
-                    VIEW YOUR WINS & PAY NOW
-                </button>
-                <p class="winner-deadline">⏰ Payment deadline: 48 hours from auction end</p>
-            </div>
-        </div>
-        
         <!-- Debug Panel (for troubleshooting) -->
         <div id="debugPanel" style="display: none; margin: 20px 0; padding: 15px; background: #f8f8f8; border: 2px solid #999; border-radius: 8px;">
             <h3 style="margin-top: 0; color: #666;">🔍 Debug Information</h3>
@@ -793,7 +781,7 @@
                         
                         if (pendingWins.length > 0) {
                             console.log(`🎉 User has ${pendingWins.length} pending wins!`);
-                            showWinnerNotification(pendingWins);
+                            // Winner notification now handled in profile page
                         } else {
                             console.log('✅ User has wins but all payments are completed');
                         }
@@ -807,35 +795,6 @@
             } catch (error) {
                 console.error('❌ Error checking for wins:', error);
             }
-        }
-        
-        // Show winner notification banner
-        function showWinnerNotification(wins) {
-            const banner = document.getElementById('winnerBanner');
-            const message = document.getElementById('winnerMessage');
-            
-            if (!banner || !message) {
-                console.error('❌ Banner or message element not found!');
-                return;
-            }
-            
-            if (wins.length === 1) {
-                message.textContent = `You won 1 auction item! Payment required within 48 hours.`;
-            } else {
-                message.textContent = `You won ${wins.length} auction items! Payment required within 48 hours.`;
-            }
-            
-            banner.style.display = 'block';
-            
-            // Scroll to show the notification
-            setTimeout(() => {
-                banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 100);
-        }
-        
-        // Go to winner page
-        function goToWinnerPage() {
-            window.location.href = 'auction-winner.html';
         }
         
         // Go to subscription page
