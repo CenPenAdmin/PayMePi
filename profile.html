@@ -98,28 +98,26 @@
   <div id="walletInfo" style="margin: 10px 0; font-size: 1.1em;"></div>
 
   <!-- User Collection Navigation Section -->
-  <div id="userCollectionSection" style="display: none; margin-top: 40px; padding: 20px; text-align: center;">
-    <h2 style="color: #030006; margin-bottom: 20px; font-size: 2em;"></h2>
-    
-    <!-- Navigation Buttons -->
-    <div style="display: flex; flex-direction: column; gap: 15px; max-width: 400px; margin: 0 auto;">
-      <button onclick="goToDigitalArt()" style="padding: 15px 20px; font-size: 1.2em; background-color: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;">
-        🎨 View My Digital Art Collection
-      </button>
-      
-      <button onclick="goToAuctionWinners()" style="padding: 15px 20px; font-size: 1.2em; background-color: #2196F3; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;">
-        🏆 View My Auction Wins
-      </button>
-    </div>
-  </div>
-
-   <!-- Collection Stats -->
-    <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-      <h3 style="color: #030006; margin-bottom: 15px; font-size: 1.3em;">Collection Overview</h3>
+  <div id="userCollectionSection" style="display: none; margin-top: 15px; text-align: center;">
+    <!-- Collection Stats -->
+    <div style="background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+      <h3 style="color: #030006; margin-bottom: 10px; font-size: 1.1em;">Collection Overview</h3>
       <div id="statsContent">
         Loading collection stats...
       </div>
     </div>
+    
+    <!-- Navigation Buttons -->
+    <div style="display: flex; flex-direction: column; gap: 10px; max-width: 400px; margin: 0 auto;">
+      <button onclick="goToDigitalArt()" style="padding: 12px 18px; font-size: 1.1em; background-color: #030006; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;">
+        🎨 View My Digital Art Collection
+      </button>
+      
+      <button onclick="goToAuctionWinners()" style="padding: 12px 18px; font-size: 1.1em; background-color: #030006; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;">
+        🏆 View My Auction Wins
+      </button>
+    </div>
+  </div>
 
   <!-- Subscription Status Text (hidden by default) -->
   <div id="subscriptionText" style="display: none; text-align: center; margin: 20px 0; font-size: 1.2em; color: #030006; font-weight: 500;">
@@ -415,15 +413,15 @@
           statsContent.innerHTML = `
             <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px;">
               <div style="text-align: center;">
-                <div style="font-size: 1.5em; font-weight: bold; color: #4CAF50;">${artCount}</div>
+                <div style="font-size: 1.5em; font-weight: bold; color: #030006;">${artCount}</div>
                 <div style="font-size: 0.9em;">Digital Artworks</div>
               </div>
               <div style="text-align: center;">
-                <div style="font-size: 1.5em; font-weight: bold; color: #2196F3;">${winsCount}</div>
+                <div style="font-size: 1.5em; font-weight: bold; color: #030006;">${winsCount}</div>
                 <div style="font-size: 0.9em;">Total Wins</div>
               </div>
               <div style="text-align: center;">
-                <div style="font-size: 1.5em; font-weight: bold; color: #FF9800;">${pendingCount}</div>
+                <div style="font-size: 1.5em; font-weight: bold; color: #030006;">${pendingCount}</div>
                 <div style="font-size: 0.9em;">Pending Items</div>
               </div>
             </div>
