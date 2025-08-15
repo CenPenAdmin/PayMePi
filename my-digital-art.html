@@ -405,10 +405,16 @@
                 }
                 
                 const result = await response.json();
+                console.log(`🎨 Raw digital art response:`, result);
                 
                 if (result.success) {
                     digitalArtCollection = result.digitalArt;
                     console.log(`🎨 Found ${digitalArtCollection.length} digital art items for ${piUser.username}`);
+                    
+                    // Debug each item's delivery status
+                    digitalArtCollection.forEach((art, index) => {
+                        console.log(`🔍 Item ${index + 1}: ${art.title} - Status: ${art.deliveryStatus} - ItemId: ${art.itemId}`);
+                    });
                     
                     displayCollection();
                 } else {

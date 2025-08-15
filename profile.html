@@ -220,16 +220,22 @@
         
         if (artResponse.ok) {
           const artData = await artResponse.json();
-          artCount = artData.success ? artData.artworks.length : 0;
+          addDebugInfo(`📊 Art response: ${JSON.stringify(artData)}`);
+          artCount = artData.success ? (artData.digitalArt ? artData.digitalArt.length : 0) : 0;
+        } else {
+          addDebugInfo(`❌ Art fetch failed: ${artResponse.status} ${artResponse.statusText}`);
         }
         
         if (winsResponse.ok) {
           const winsData = await winsResponse.json();
+          addDebugInfo(`📊 Wins response: ${JSON.stringify(winsData)}`);
           if (winsData.success) {
-            winsCount = winsData.wins.length;
+            winsCount = winsData.wins ? winsData.wins.length : 0;
             // Count pending items (not completed)
-            pendingCount = winsData.wins.filter(win => !win.completed).length;
+            pendingCount = winsData.wins ? winsData.wins.filter(win => !win.completed).length : 0;
           }
+        } else {
+          addDebugInfo(`❌ Wins fetch failed: ${winsResponse.status} ${winsResponse.statusText}`);
         }
         
         // Update stats display

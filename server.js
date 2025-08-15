@@ -26,7 +26,7 @@ app.use(cors({
         const allowedOrigins = [
             'http://localhost:3000',
             'https://CenPenAdmin.github.io',
-            'https://9faae0f045fd.ngrok-free.app'
+            'https://c94399ca3848.ngrok-free.app'
         ];
         
         const allowedPatterns = [
@@ -940,11 +940,63 @@ app.get('/user-digital-art/:username', async (req, res) => {
         
         console.log(`🎨 Getting digital art collection for user: ${username}`);
         
+        // First, check for any paid auction winners that don't have delivery records
+        console.log(`🔄 Checking for missing digital art delivery records for ${username}...`);
+        
+        const paidWinners = await db.collection('auction_winners').find({
+            winnerUsername: username,
+            paymentStatus: 'paid',
+            digitalArtStatus: { $in: ['ready_for_delivery', 'delivered'] }
+        }).toArray();
+        
+        console.log(`🔍 Found ${paidWinners.length} paid auction wins for ${username}`);
+        
+        // Check which ones don't have delivery records
+        for (const winner of paidWinners) {
+            const existingDelivery = await db.collection('digital_art_delivery').findOne({
+                username: username,
+                itemId: winner.itemId
+            });
+            
+            if (!existingDelivery) {
+                console.log(`🔧 Creating missing delivery record for ${winner.itemId}`);
+                
+                // Create the missing delivery record
+                await db.collection('digital_art_delivery').insertOne({
+                    winnerId: winner._id,
+                    username: username,
+                    userUid: winner.userUid,
+                    itemId: winner.itemId,
+                    auctionId: winner.auctionId || 'auction_1',
+                    deliveryStatus: 'ready', // Mark as ready since payment was completed
+                    paymentDetails: {
+                        paymentId: winner.paymentId,
+                        txId: winner.txId,
+                        paidAmount: winner.paidAmount,
+                        paidAt: winner.paidAt
+                    },
+                    digitalAsset: {
+                        title: getArtTitle(winner.itemId),
+                        artist: getArtArtist(winner.itemId),
+                        description: getArtDescription(winner.itemId),
+                        highResUrl: null,
+                        downloadUrl: null,
+                        licenseType: 'personal_use'
+                    },
+                    createdAt: winner.paidAt || new Date(),
+                    accessLog: []
+                });
+                
+                console.log(`✅ Created delivery record for ${winner.itemId}`);
+            }
+        }
+        
+        // Now get all digital art delivery records for the user
         const artCollection = await db.collection('digital_art_delivery').find({ 
             username: username 
         }).sort({ createdAt: -1 }).toArray();
         
-        console.log(`🔍 Found ${artCollection.length} digital art items for ${username}`);
+        console.log(`🔍 Found ${artCollection.length} digital art items for ${username} (after sync)`);
         
         res.json({ 
             success: true, 
@@ -2656,7 +2708,7 @@ app.get('/health', (req, res) => {
             allowedOrigins: [
                 'http://localhost:3000',
                 'https://CenPenAdmin.github.io',
-                'https://9faae0f045fd.ngrok-free.app'
+                'https://c94399ca3848.ngrok-free.app'
             ]
         }
     });
@@ -2789,7 +2841,7 @@ app.get('/debug/system-status', async (req, res) => {
             server: {
                 running: true,
                 port: PORT,
-                ngrokUrl: 'https://9faae0f045fd.ngrok-free.app',
+                ngrokUrl: 'https://c94399ca3848.ngrok-free.app',
                 piApiKey: !!PI_API_KEY
             },
             database: {
@@ -3018,6 +3070,121 @@ app.get('/debug/ping', (req, res) => {
     });
 });
 
+// Debug endpoint to check digital art delivery records
+app.get('/debug/digital-art/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        console.log(`🔍 DEBUG - Checking digital art records for: ${username}`);
+        
+        // Get raw digital art delivery records
+        const deliveryRecords = await db.collection('digital_art_delivery').find({ 
+            username: username 
+        }).sort({ createdAt: -1 }).toArray();
+        
+        // Get auction winners for this user
+        const winnerRecords = await db.collection('auction_winners').find({ 
+            winnerUsername: username 
+        }).toArray();
+        
+        console.log(`🔍 Found ${deliveryRecords.length} delivery records and ${winnerRecords.length} winner records`);
+        
+        res.json({ 
+            success: true, 
+            username: username,
+            deliveryRecords: deliveryRecords,
+            winnerRecords: winnerRecords,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ DEBUG - Error checking digital art records:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Debug endpoint to sync missing digital art delivery records
+app.post('/debug/sync-digital-art/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        console.log(`🔄 DEBUG - Syncing digital art records for: ${username}`);
+        
+        // Get all paid auction winners that don't have delivery records
+        const paidWinners = await db.collection('auction_winners').find({
+            winnerUsername: username,
+            paymentStatus: 'paid'
+        }).toArray();
+        
+        const existingDeliveryRecords = await db.collection('digital_art_delivery').find({
+            username: username
+        }).toArray();
+        
+        // Find missing delivery records
+        const missingDeliveries = [];
+        for (const winner of paidWinners) {
+            const hasDelivery = existingDeliveryRecords.some(delivery => 
+                delivery.winnerId && delivery.winnerId.toString() === winner._id.toString()
+            );
+            
+            if (!hasDelivery) {
+                missingDeliveries.push(winner);
+            }
+        }
+        
+        console.log(`🔍 Found ${missingDeliveries.length} missing delivery records`);
+        
+        // Create missing delivery records
+        const createdRecords = [];
+        for (const winner of missingDeliveries) {
+            const deliveryRecord = {
+                winnerId: winner._id,
+                username: username,
+                userUid: winner.userUid || 'unknown',
+                itemId: winner.itemId,
+                auctionId: winner.auctionId || 'auction_1',
+                deliveryStatus: 'ready', // Set as ready since payment is already completed
+                paymentDetails: {
+                    paymentId: winner.paymentId,
+                    txId: winner.txId,
+                    paidAmount: winner.paidAmount || winner.winningBid,
+                    paidAt: winner.paidAt || new Date()
+                },
+                digitalAsset: {
+                    title: getArtTitle(winner.itemId),
+                    artist: getArtArtist(winner.itemId),
+                    description: getArtDescription(winner.itemId),
+                    highResUrl: null,
+                    downloadUrl: null,
+                    licenseType: 'personal_use'
+                },
+                createdAt: new Date(),
+                accessLog: []
+            };
+            
+            const insertResult = await db.collection('digital_art_delivery').insertOne(deliveryRecord);
+            createdRecords.push({
+                winnerId: winner._id,
+                itemId: winner.itemId,
+                deliveryId: insertResult.insertedId
+            });
+            
+            console.log(`✅ Created delivery record for ${winner.itemId}`);
+        }
+        
+        res.json({
+            success: true,
+            username: username,
+            missingCount: missingDeliveries.length,
+            createdCount: createdRecords.length,
+            createdRecords: createdRecords,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ DEBUG - Error syncing digital art records:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // =============================================================================
 // END DEBUG ENDPOINTS
 // =============================================================================
@@ -3026,13 +3193,13 @@ app.get('/debug/ping', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Access your app locally at: http://localhost:${PORT}`);
-    console.log(`Access your app via ngrok at: https://9faae0f045fd.ngrok-free.app`);
+    console.log(`Access your app via ngrok at: https://c94399ca3848.ngrok-free.app`);
     console.log(`\n🔧 DEBUG ENDPOINTS:`);
-    console.log(`- System Status: https://9faae0f045fd.ngrok-free.app/debug/system-status`);
-    console.log(`- Test Ping: https://9faae0f045fd.ngrok-free.app/debug/ping`);
-    console.log(`- Test Subscription: POST https://9faae0f045fd.ngrok-free.app/debug/test-subscription`);
-    console.log(`- Test Bidding: POST https://9faae0f045fd.ngrok-free.app/debug/test-bidding`);
-    console.log(`- Test Payment: POST https://9faae0f045fd.ngrok-free.app/debug/test-payment-completion`);
+    console.log(`- System Status: https://c94399ca3848.ngrok-free.app/debug/system-status`);
+    console.log(`- Test Ping: https://c94399ca3848.ngrok-free.app/debug/ping`);
+    console.log(`- Test Subscription: POST https://c94399ca3848.ngrok-free.app/debug/test-subscription`);
+    console.log(`- Test Bidding: POST https://c94399ca3848.ngrok-free.app/debug/test-bidding`);
+    console.log(`- Test Payment: POST https://c94399ca3848.ngrok-free.app/debug/test-payment-completion`);
     console.log('\nIMPORTANT: Remember to:');
     console.log('1. Get your Pi API key from Pi Developer Portal');
     console.log('2. Set your PI_API_KEY environment variable');
