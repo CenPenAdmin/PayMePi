@@ -304,13 +304,12 @@
             <div class="auction-item" data-item-id="item1">
                 <div class="artist-name">Hanoi Boi</div>
                 <div class="artwork-title">"Chomp Bomper One"</div>
-                <div class="reserve-bid">Minimum Reserve: 10 Pi</div>
                 <div class="artwork-image">
                     [Artwork Image Coming Soon]
                 </div>
                 <div class="bid-section hidden" id="bidSection1">
                     <div id="bidInputContainer1">Your Bid: 
-                        <input type="number" class="bid-input" id="bidInput1" min="3" step="0.1" placeholder="3.0">
+                        <input type="number" class="bid-input" id="bidInput1" min="0.01" step="0.01" placeholder="0.01">
                         Pi
                         <button class="bid-button" onclick="placeBid('item1', 1)">Place Bid</button>
                     </div>
@@ -325,14 +324,13 @@
             <div class="auction-item" data-item-id="item2">
                 <div class="artist-name">Hanoi Boi</div>
                 <div class="artwork-title">"Chomp Bomper Two"</div>
-                <div class="reserve-bid">Minimum Reserve: 6 Pi</div>
                 <div class="artwork-image">
                     [Artwork Image Coming Soon]
                     <img src="images/middle finger man.png" alt="Appraisal" style="height:240px; width:240px; object-fit:cover; border:1px solid #fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.10);">
                 </div>
                 <div class="bid-section hidden" id="bidSection2">
                     <div id="bidInputContainer2">Your Bid: 
-                        <input type="number" class="bid-input" id="bidInput2" min="3" step="0.1" placeholder="3.0">
+                        <input type="number" class="bid-input" id="bidInput2" min="0.01" step="0.01" placeholder="0.01">
                         Pi
                         <button class="bid-button" onclick="placeBid('item2', 2)">Place Bid</button>
                     </div>
@@ -347,13 +345,12 @@
             <div class="auction-item" data-item-id="item3">
                 <div class="artist-name">Hanoi Boi</div>
                 <div class="artwork-title">"Chomp Bomper Three"</div>
-                <div class="reserve-bid">Minimum Reserve: 3 Pi</div>
                 <div class="artwork-image">
                     [Artwork Image Coming Soon]
                 </div>
                 <div class="bid-section hidden" id="bidSection3">
                     <div id="bidInputContainer3">Your Bid: 
-                        <input type="number" class="bid-input" id="bidInput3" min="3" step="0.1" placeholder="3.0">
+                        <input type="number" class="bid-input" id="bidInput3" min="0.01" step="0.01" placeholder="0.01">
                         Pi
                         <button class="bid-button" onclick="placeBid('item3', 3)">Place Bid</button>
                     </div>
@@ -368,13 +365,12 @@
             <div class="auction-item" data-item-id="item4">
                 <div class="artist-name">Hanoi Boi</div>
                 <div class="artwork-title">"Chomp Bomper Four"</div>
-                <div class="reserve-bid">Minimum Reserve: 4 Pi</div>
                 <div class="artwork-image">
                     [Artwork Image Coming Soon]
                 </div>
                 <div class="bid-section hidden" id="bidSection4">
                     <div id="bidInputContainer4">Your Bid: 
-                        <input type="number" class="bid-input" id="bidInput4" min="3" step="0.1" placeholder="3.0">
+                        <input type="number" class="bid-input" id="bidInput4" min="0.01" step="0.01" placeholder="0.01">
                         Pi
                         <button class="bid-button" onclick="placeBid('item4', 4)">Place Bid</button>
                     </div>
@@ -389,13 +385,12 @@
             <div class="auction-item" data-item-id="item5">
                 <div class="artist-name">Hanoi Boi</div>
                 <div class="artwork-title">"Chomp Bomper Five"</div>
-                <div class="reserve-bid">Minimum Reserve: 10 Pi</div>
                 <div class="artwork-image">
                     [Artwork Image Coming Soon]
                 </div>
                 <div class="bid-section hidden" id="bidSection5">
                     <div id="bidInputContainer5">Your Bid: 
-                        <input type="number" class="bid-input" id="bidInput5" min="3" step="0.1" placeholder="3.0">
+                        <input type="number" class="bid-input" id="bidInput5" min="0.01" step="0.01" placeholder="0.01">
                         Pi
                         <button class="bid-button" onclick="placeBid('item5', 5)">Place Bid</button>
                     </div>
@@ -748,8 +743,8 @@
             const bidInput = document.getElementById(`bidInput${itemNumber}`);
             const bidAmount = parseFloat(bidInput.value);
             
-            if (!bidAmount || bidAmount < 3) {
-                alert('Please enter a valid bid amount (minimum 3 Pi)');
+            if (!bidAmount || bidAmount <= 0) {
+                alert('Please enter a valid bid amount (minimum 0.01 Pi)');
                 return;
             }
             

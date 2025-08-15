@@ -2015,10 +2015,10 @@ app.post('/place-auction-bid', async (req, res) => {
         }
         
         // Validate minimum bid amount
-        if (bidAmount < 3) {
+        if (bidAmount <= 0) {
             return res.status(400).json({ 
                 success: false, 
-                error: 'Minimum bid amount is 3 Pi' 
+                error: 'Minimum bid amount is 0.01 Pi' 
             });
         }
         
