@@ -411,28 +411,37 @@
         
         // Update stats display
         const statsContent = document.getElementById('statsContent');
-        statsContent.innerHTML = `
-          <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px;">
-            <div style="text-align: center;">
-              <div style="font-size: 1.5em; font-weight: bold; color: #4CAF50;">${artCount}</div>
-              <div style="font-size: 0.9em;">Digital Artworks</div>
+        if (statsContent) {
+          statsContent.innerHTML = `
+            <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px;">
+              <div style="text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #4CAF50;">${artCount}</div>
+                <div style="font-size: 0.9em;">Digital Artworks</div>
+              </div>
+              <div style="text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #2196F3;">${winsCount}</div>
+                <div style="font-size: 0.9em;">Total Wins</div>
+              </div>
+              <div style="text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #FF9800;">${pendingCount}</div>
+                <div style="font-size: 0.9em;">Pending Items</div>
+              </div>
             </div>
-            <div style="text-align: center;">
-              <div style="font-size: 1.5em; font-weight: bold; color: #2196F3;">${winsCount}</div>
-              <div style="font-size: 0.9em;">Total Wins</div>
-            </div>
-            <div style="text-align: center;">
-              <div style="font-size: 1.5em; font-weight: bold; color: #FF9800;">${pendingCount}</div>
-              <div style="font-size: 0.9em;">Pending Items</div>
-            </div>
-          </div>
-        `;
+          `;
+        } else {
+          addDebugInfo('❌ ERROR: statsContent element not found!');
+        }
         
         addDebugInfo(`📊 Collection stats loaded: ${artCount} artworks, ${winsCount} wins, ${pendingCount} pending`);
         
       } catch (error) {
         addDebugInfo(`❌ Failed to load collection stats: ${error.message}`);
-        document.getElementById('statsContent').innerHTML = 'Failed to load stats';
+        const statsContent = document.getElementById('statsContent');
+        if (statsContent) {
+          statsContent.innerHTML = 'Failed to load stats';
+        } else {
+          addDebugInfo('❌ ERROR: statsContent element not found in catch block!');
+        }
       }
     }
 
@@ -500,7 +509,12 @@
         console.log('Full Pi user object:', piUser);
         
         // Display user information
-        document.getElementById("userInfo").innerHTML = `<strong>Username:</strong> ${piUser.username}`;
+        const userInfoElement = document.getElementById("userInfo");
+        if (userInfoElement) {
+          userInfoElement.innerHTML = `<strong>Username:</strong> ${piUser.username}`;
+        } else {
+          addDebugInfo('❌ ERROR: userInfo element not found!');
+        }
         displayWalletInfo(piUser.wallet);
         
         addDebugInfo('🔄 Creating/updating user profile in backend...');
@@ -514,7 +528,13 @@
         await checkSubscriptionStatusAndUpdateUI(piUser.username);
         
         // Show collection section and load stats
-        document.getElementById('userCollectionSection').style.display = 'block';
+        const collectionSection = document.getElementById('userCollectionSection');
+        if (collectionSection) {
+          collectionSection.style.display = 'block';
+          addDebugInfo('✅ Collection section shown');
+        } else {
+          addDebugInfo('❌ ERROR: userCollectionSection element not found!');
+        }
         await loadCollectionStats(piUser.username);
         
         // Check for new wins and show congratulations popup if needed
