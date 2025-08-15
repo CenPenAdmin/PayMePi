@@ -2022,24 +2022,33 @@ app.post('/place-auction-bid', async (req, res) => {
             });
         }
         
-        // Check if user already has a bid for this item
+        // Check if user has ever placed a bid for this item (active or removed)
         const existingUserBid = await db.collection('auction_bids').findOne({
             username: username,
             itemId: itemId
         });
         
         if (existingUserBid) {
-            console.log(`❌ User ${username} already has a bid on ${itemId}`);
-            return res.status(400).json({ 
-                success: false, 
-                error: 'You have already placed a bid on this item' 
-            });
+            if (existingUserBid.status === 'active') {
+                console.log(`❌ User ${username} already has an active bid on ${itemId}`);
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'You have already placed a bid on this item' 
+                });
+            } else if (existingUserBid.status === 'removed') {
+                console.log(`❌ User ${username} already used their bid opportunity on ${itemId}`);
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'You have already used your bidding opportunity on this item. Each user is allowed only one bid per item.' 
+                });
+            }
         }
         
-        // Check if the exact bid amount already exists for this item
+        // Check if the exact bid amount already exists for this item (only active bids)
         const existingBidAmount = await db.collection('auction_bids').findOne({
             itemId: itemId,
-            bidAmount: bidAmount
+            bidAmount: bidAmount,
+            status: 'active'
         });
         
         if (existingBidAmount) {
@@ -2106,6 +2115,125 @@ app.post('/place-auction-bid', async (req, res) => {
         
     } catch (error) {
         console.error('❌ Error placing auction bid:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Remove an auction bid
+app.post('/remove-auction-bid', async (req, res) => {
+    try {
+        const { username, userUid, itemId } = req.body;
+        
+        console.log(`🗑️ Processing bid removal: ${username} removing bid on ${itemId}`);
+        
+        // Validate required fields
+        if (!username || !userUid || !itemId) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Missing required fields: username, userUid, itemId' 
+            });
+        }
+        
+        // Check if auction is currently active
+        const auctionStatus = await getAuctionStatus();
+        if (!auctionStatus.isActive) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Cannot remove bids - ' + auctionStatus.message 
+            });
+        }
+        
+        // Find the user's active bid for this item
+        const existingBid = await db.collection('auction_bids').findOne({
+            username: username,
+            itemId: itemId,
+            status: 'active'
+        });
+        
+        if (!existingBid) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'No active bid found for this item' 
+            });
+        }
+        
+        // Mark the bid as removed instead of deleting it (to track the action)
+        await db.collection('auction_bids').updateOne(
+            { _id: existingBid._id },
+            { 
+                $set: { 
+                    status: 'removed',
+                    removedAt: new Date(),
+                    removedTimestamp: new Date().toISOString()
+                }
+            }
+        );
+        
+        console.log(`✅ Bid removed successfully: ${username} - ${existingBid.bidAmount} Pi on ${itemId}`);
+        
+        // Log activity
+        await db.collection('user_activities').insertOne({
+            username: username,
+            userUid: userUid,
+            action: 'auction_bid_removed',
+            details: {
+                itemId: itemId,
+                originalBidAmount: existingBid.bidAmount,
+                auctionId: 'auction_1'
+            },
+            timestamp: new Date(),
+            ipAddress: req.ip
+        });
+        
+        res.json({ 
+            success: true, 
+            message: 'Bid removed successfully',
+            removedBidAmount: existingBid.bidAmount,
+            itemId: itemId
+        });
+        
+    } catch (error) {
+        console.error('❌ Error removing auction bid:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get user's bid status for all items
+app.get('/user-bid-status/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        if (!username) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Username is required' 
+            });
+        }
+        
+        // Get all bids for this user
+        const userBids = await db.collection('auction_bids').find({
+            username: username,
+            auctionId: 'auction_1'
+        }).toArray();
+        
+        // Create status object for each item
+        const bidStatus = {};
+        userBids.forEach(bid => {
+            bidStatus[bid.itemId] = {
+                status: bid.status, // 'active' or 'removed'
+                bidAmount: bid.bidAmount,
+                timestamp: bid.timestamp,
+                removedAt: bid.removedAt || null
+            };
+        });
+        
+        res.json({ 
+            success: true, 
+            bidStatus: bidStatus 
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting user bid status:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

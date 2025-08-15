@@ -139,6 +139,26 @@
             cursor: not-allowed;
         }
         
+        .remove-bid-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        
+        .remove-bid-button:hover {
+            background: #c82333;
+        }
+        
+        .remove-bid-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
         .bid-status {
             margin-top: 10px;
             font-size: 0.9em;
@@ -289,10 +309,13 @@
                     [Artwork Image Coming Soon]
                 </div>
                 <div class="bid-section hidden" id="bidSection1">
-                    <div>Your Bid: 
+                    <div id="bidInputContainer1">Your Bid: 
                         <input type="number" class="bid-input" id="bidInput1" min="3" step="0.1" placeholder="3.0">
                         Pi
                         <button class="bid-button" onclick="placeBid('item1', 1)">Place Bid</button>
+                    </div>
+                    <div id="bidActionsContainer1" class="hidden">
+                        <button class="remove-bid-button" onclick="removeBid('item1', 1)">Remove Bid</button>
                     </div>
                     <div class="bid-status" id="bidStatus1"></div>
                 </div>
@@ -307,10 +330,13 @@
                     [Artwork Image Coming Soon]
                 </div>
                 <div class="bid-section hidden" id="bidSection2">
-                    <div>Your Bid: 
+                    <div id="bidInputContainer2">Your Bid: 
                         <input type="number" class="bid-input" id="bidInput2" min="3" step="0.1" placeholder="3.0">
                         Pi
                         <button class="bid-button" onclick="placeBid('item2', 2)">Place Bid</button>
+                    </div>
+                    <div id="bidActionsContainer2" class="hidden">
+                        <button class="remove-bid-button" onclick="removeBid('item2', 2)">Remove Bid</button>
                     </div>
                     <div class="bid-status" id="bidStatus2"></div>
                 </div>
@@ -325,10 +351,13 @@
                     [Artwork Image Coming Soon]
                 </div>
                 <div class="bid-section hidden" id="bidSection3">
-                    <div>Your Bid: 
+                    <div id="bidInputContainer3">Your Bid: 
                         <input type="number" class="bid-input" id="bidInput3" min="3" step="0.1" placeholder="3.0">
                         Pi
                         <button class="bid-button" onclick="placeBid('item3', 3)">Place Bid</button>
+                    </div>
+                    <div id="bidActionsContainer3" class="hidden">
+                        <button class="remove-bid-button" onclick="removeBid('item3', 3)">Remove Bid</button>
                     </div>
                     <div class="bid-status" id="bidStatus3"></div>
                 </div>
@@ -343,10 +372,13 @@
                     [Artwork Image Coming Soon]
                 </div>
                 <div class="bid-section hidden" id="bidSection4">
-                    <div>Your Bid: 
+                    <div id="bidInputContainer4">Your Bid: 
                         <input type="number" class="bid-input" id="bidInput4" min="3" step="0.1" placeholder="3.0">
                         Pi
                         <button class="bid-button" onclick="placeBid('item4', 4)">Place Bid</button>
+                    </div>
+                    <div id="bidActionsContainer4" class="hidden">
+                        <button class="remove-bid-button" onclick="removeBid('item4', 4)">Remove Bid</button>
                     </div>
                     <div class="bid-status" id="bidStatus4"></div>
                 </div>
@@ -361,10 +393,13 @@
                     [Artwork Image Coming Soon]
                 </div>
                 <div class="bid-section hidden" id="bidSection5">
-                    <div>Your Bid: 
+                    <div id="bidInputContainer5">Your Bid: 
                         <input type="number" class="bid-input" id="bidInput5" min="3" step="0.1" placeholder="3.0">
                         Pi
                         <button class="bid-button" onclick="placeBid('item5', 5)">Place Bid</button>
+                    </div>
+                    <div id="bidActionsContainer5" class="hidden">
+                        <button class="remove-bid-button" onclick="removeBid('item5', 5)">Remove Bid</button>
                     </div>
                     <div class="bid-status" id="bidStatus5"></div>
                 </div>
@@ -700,8 +735,13 @@
             
             // Check if user already bid on this item
             if (userBids[itemId]) {
-                alert('You have already placed a bid on this item');
-                return;
+                if (userBids[itemId].status === 'active') {
+                    alert('You have already placed a bid on this item');
+                    return;
+                } else if (userBids[itemId].status === 'removed') {
+                    alert('You have already used your bidding opportunity on this item. Each user is allowed only one bid per item.');
+                    return;
+                }
             }
             
             const bidInput = document.getElementById(`bidInput${itemNumber}`);
@@ -736,18 +776,18 @@
                 
                 if (result.success) {
                     // Mark bid as placed
-                    userBids[itemId] = bidAmount;
+                    userBids[itemId] = {
+                        bidAmount: bidAmount,
+                        status: 'active'
+                    };
                     
-                    // Update UI
-                    bidInput.disabled = true;
+                    // Update UI - hide input, show remove button
+                    document.getElementById(`bidInputContainer${itemNumber}`).style.display = 'none';
+                    document.getElementById(`bidActionsContainer${itemNumber}`).classList.remove('hidden');
+                    
                     document.getElementById(`bidStatus${itemNumber}`).innerHTML = `
                         <span style="color: green;">✅ Your bid: ${bidAmount} Pi (submitted)</span>
                     `;
-                    
-                    // Disable bid button
-                    const bidButton = document.querySelector(`#bidSection${itemNumber} .bid-button`);
-                    bidButton.disabled = true;
-                    bidButton.textContent = 'Bid Submitted';
                     
                     console.log(`✅ Bid placed successfully: ${bidAmount} Pi on ${itemId}`);
                 } else {
@@ -757,6 +797,113 @@
             } catch (error) {
                 console.error('❌ Failed to place bid:', error);
                 alert('Failed to place bid. Please try again.');
+            }
+        }
+        
+        // Remove a bid from an item
+        async function removeBid(itemId, itemNumber) {
+            if (!piUser) {
+                alert('Please authenticate first');
+                return;
+            }
+            
+            if (!userBids[itemId] || userBids[itemId].status !== 'active') {
+                alert('No active bid found for this item');
+                return;
+            }
+            
+            // Confirm removal
+            if (!confirm(`Are you sure you want to remove your bid of ${userBids[itemId].bidAmount} Pi? You will not be able to bid on this item again.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${CONFIG.BACKEND_URL}/remove-auction-bid`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        username: piUser.username,
+                        userUid: piUser.uid,
+                        itemId: itemId
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update bid status
+                    userBids[itemId].status = 'removed';
+                    
+                    // Update UI - hide remove button, show disabled state
+                    document.getElementById(`bidActionsContainer${itemNumber}`).classList.add('hidden');
+                    
+                    document.getElementById(`bidStatus${itemNumber}`).innerHTML = `
+                        <span style="color: #888;">❌ Bid removed - No longer eligible to bid on this item</span>
+                    `;
+                    
+                    console.log(`✅ Bid removed successfully: ${itemId}`);
+                } else {
+                    alert('Failed to remove bid: ' + result.error);
+                }
+                
+            } catch (error) {
+                console.error('❌ Failed to remove bid:', error);
+                alert('Failed to remove bid. Please try again.');
+            }
+        }
+        
+        // Load user's existing bids
+        async function loadUserBids() {
+            if (!piUser) return;
+            
+            try {
+                const response = await fetch(`${CONFIG.BACKEND_URL}/user-bid-status/${piUser.username}`, {
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        userBids = result.bidStatus;
+                        
+                        // Update UI for each item based on bid status
+                        for (const [itemId, bidInfo] of Object.entries(userBids)) {
+                            const itemNumber = itemId.replace('item', '');
+                            
+                            if (bidInfo.status === 'active') {
+                                // Show active bid with remove button
+                                document.getElementById(`bidInputContainer${itemNumber}`).style.display = 'none';
+                                document.getElementById(`bidActionsContainer${itemNumber}`).classList.remove('hidden');
+                                document.getElementById(`bidStatus${itemNumber}`).innerHTML = `
+                                    <span style="color: green;">✅ Your bid: ${bidInfo.bidAmount} Pi (submitted)</span>
+                                `;
+                            } else if (bidInfo.status === 'removed') {
+                                // Show removed status
+                                document.getElementById(`bidInputContainer${itemNumber}`).style.display = 'none';
+                                document.getElementById(`bidStatus${itemNumber}`).innerHTML = `
+                                    <span style="color: #888;">❌ Bid removed - No longer eligible to bid on this item</span>
+                                `;
+                            }
+                        }
+                        
+                        console.log('✅ User bid status loaded:', userBids);
+                    }
+                } else {
+                    console.log('⚠️ Could not load user bid status');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading user bid status:', error);
             }
         }
         
