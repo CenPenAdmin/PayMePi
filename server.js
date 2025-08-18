@@ -2763,7 +2763,7 @@ async function getAuctionStatus() {
     // OPTION 1: Fixed time today
     const auctionEnd = new Date();
     auctionEnd.setDate(auctionEnd.getDate()); // Today
-    auctionEnd.setHours(16, 10, 0, 0); // 4:10 PM (16:10)
+    auctionEnd.setHours(18, 15, 0, 0); // 6:15 PM (18:15)
 
     // OPTION 2: Dynamic time (uncomment to use - ends 1 hour from now)
     // const auctionEnd = new Date(Date.now() + (60 * 60 * 1000)); // 1 hour from now
