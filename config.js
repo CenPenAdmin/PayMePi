@@ -6,7 +6,7 @@ const CONFIG = {
     // Pi SDK Configuration
     PI_SDK: {
         version: "2.0",
-        sandbox: false // true for testnet, false for mainnet
+        sandbox: true // Set to true for testnet
     },
     
     // Payment Configuration
