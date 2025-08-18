@@ -26,7 +26,9 @@ app.use(cors({
         const allowedOrigins = [
             'http://localhost:3000',
             'https://CenPenAdmin.github.io',
-            'https://c047dec48ba2.ngrok-free.app'
+            'https://c047dec48ba2.ngrok-free.app',
+            'https://appraisells.xyz',      // Add this line
+            'http://appraisells.xyz'        // Add this too (just in case)
         ];
         
         const allowedPatterns = [
@@ -908,11 +910,11 @@ app.post('/complete-payment', async (req, res) => {
 // Helper functions for auction art information
 function getArtTitle(itemId) {
     const artInfo = {
-        'art_piece_1': 'Chomp Bomper One',
-        'art_piece_2': 'Chomp Bomper Two', 
-        'art_piece_3': 'Chomp Bomper Three',
-        'art_piece_4': 'Chomp Bomper Four',
-        'art_piece_5': 'Chomp Bomper Five'
+        'art_piece_1': 'Chomp Bomber One',
+        'art_piece_2': 'Chomp Bomber Two', 
+        'art_piece_3': 'Chomp Bomber Three',
+        'art_piece_4': 'Chomp Bomber Four',
+        'art_piece_5': 'Chomp Bomber Five'
     };
     return artInfo[itemId] || 'Unknown Artwork';
 }
@@ -924,11 +926,11 @@ function getArtArtist(itemId) {
 
 function getArtDescription(itemId) {
     const descriptions = {
-        'art_piece_1': 'Original digital artwork "Chomp Bomper One" by Hanoi Boi',
-        'art_piece_2': 'Original digital artwork "Chomp Bomper Two" by Hanoi Boi',
-        'art_piece_3': 'Original digital artwork "Chomp Bomper Three" by Hanoi Boi', 
-        'art_piece_4': 'Original digital artwork "Chomp Bomper Four" by Hanoi Boi',
-        'art_piece_5': 'Original digital artwork "Chomp Bomper Five" by Hanoi Boi'
+        'art_piece_1': 'Original digital artwork "Chomp Bomber One" by Hanoi Boi',
+        'art_piece_2': 'Original digital artwork "Chomp Bomber Two" by Hanoi Boi',
+        'art_piece_3': 'Original digital artwork "Chomp Bomber Three" by Hanoi Boi', 
+        'art_piece_4': 'Original digital artwork "Chomp Bomber Four" by Hanoi Boi',
+        'art_piece_5': 'Original digital artwork "Chomp Bomber Five" by Hanoi Boi'
     };
     return descriptions[itemId] || 'Original digital artwork';
 }
@@ -2241,6 +2243,7 @@ app.get('/user-bid-status/:username', async (req, res) => {
 // Get auction status and timing
 app.get('/auction-status', async (req, res) => {
     try {
+
         const auctionStatus = await getAuctionStatus();
         res.json(auctionStatus);
     } catch (error) {
@@ -2601,7 +2604,7 @@ app.get('/my-digital-art/:username', async (req, res) => {
                     description: getArtDescription(win.itemId),
                     highResUrl: deliveryRecord?.digitalAsset?.highResUrl || '/placeholder-art.jpg',
                     downloadUrl: deliveryRecord?.digitalAsset?.downloadUrl || null,
-                    licenseType: deliveryRecord?.digitalAsset?.licenseType || 'personal_use'
+                    licenseType: 'personal_use'
                 },
                 deliveryStatus: deliveryRecord?.deliveryStatus || 'ready',
                 accessCount: deliveryRecord?.accessLog?.length || 0,
