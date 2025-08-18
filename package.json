@@ -1,7 +1,7 @@
 {
-  "name": "pi-payment-app",
+  "name": "appraisells",
   "version": "1.0.0",
-  "description": "Minimal Pi Network payment app for learning",
+  "description": "Pi Network Digital Art Auction Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -15,10 +15,15 @@
     "mongodb": "^6.18.0"
   },
   "keywords": [
-    "pi",
+    "pi-network",
+    "auction",
+    "digital-art",
     "blockchain",
-    "payment"
+    "payments"
   ],
-  "author": "Your Name",
-  "license": "MIT"
+  "author": "Appraisells",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
